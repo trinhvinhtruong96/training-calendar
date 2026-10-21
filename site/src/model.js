@@ -11,6 +11,19 @@ export function isRun(activity) {
 
 const sum = (items, pick) => items.reduce((total, item) => total + (Number(pick(item)) || 0), 0);
 const sameId = (a, b) => a != null && b != null && String(a) === String(b);
+const isRunSport = sport => !sport || /run/i.test(sport);
+const MARKED = new Set(["test", "key", "race"]);
+
+// A run fits a run workout; anything else (e.g. WeightTraining) only fits its own sport.
+function fits(workout, activity) {
+  if (isRunSport(workout.sport)) return isRun(activity);
+  return String(activity.type ?? "").toLowerCase() === String(workout.sport).toLowerCase();
+}
+
+// The workout that colours and marks the day: test/key/race first, then a run, else the first entry.
+export function primaryWorkout(day) {
+  return day.workouts.find(w => MARKED.has(w.type)) ?? day.workouts.find(w => isRunSport(w.sport)) ?? day.workouts[0] ?? null;
+}
 
 export function buildModel(data, today, plan = PLAN) {
   const events = data?.events ?? [];
@@ -55,7 +68,7 @@ export function buildModel(data, today, plan = PLAN) {
   for (const day of days) {
     for (const w of day.workouts) {
       if (w.run) continue;
-      const a = day.activities.find(x => isRun(x) && !used.has(x.id));
+      const a = day.activities.find(x => fits(w, x) && !used.has(x.id));
       if (a) {
         w.run = a;
         used.add(a.id);

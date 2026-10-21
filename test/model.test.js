@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { activityUrl, buildModel, dayLabel, dayUrl, headerInfo, runSummary, statusInfo } from "../site/src/model.js";
+import {
+  activityUrl, buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, runSummary, statusInfo,
+} from "../site/src/model.js";
 import { activities, events } from "./fixtures.js";
 
 const data = { events, activities };
@@ -108,6 +110,34 @@ test("run summary, including runs with missing numbers", () => {
   assert.deepEqual(runSummary({ id: "i20", distance: 0, movingTime: 0, avgHr: null, compliance: null }), {
     distance: "", time: "", pace: "", hr: "", compliance: "", url: "https://intervals.icu/activities/i20",
   });
+});
+
+test("a non-run event on a plan day does not take the run or the day's mark", () => {
+  const gym = {
+    id: 50, date: "2026-10-22", category: "WORKOUT", sport: "WeightTraining", name: "Gym", description: "",
+    distance: 0, movingTime: 2700, pairedActivityId: null, steps: [],
+  };
+  const testDay = { ...events[2], name: "W03 Thu - TEST 1 10 km" };
+  const planned = [gym, ...events.filter(e => e.id !== 3), testDay];
+  const m = buildModel({ events: planned, activities }, "2026-10-23");
+  const day = m.byDate.get("2026-10-22");
+  assert.equal(day.workouts.find(w => w.id === 3).run.id, "i13");
+  assert.equal(day.workouts.find(w => w.id === 50).run, null);
+  assert.equal(primaryWorkout(day).id, 3);
+  assert.equal(day.status, "partial");
+
+  const lifted = { id: "i30", date: "2026-10-22", type: "WeightTraining", name: "Gym", distance: 0, movingTime: 2600, avgHr: null, pairedEventId: null, compliance: null };
+  const m2 = buildModel({ events: planned, activities: [...activities, lifted] }, "2026-10-23");
+  assert.equal(m2.byDate.get("2026-10-22").workouts.find(w => w.id === 50).run.id, "i30");
+  assert.equal(m2.byDate.get("2026-10-22").status, "done");
+});
+
+test("primary workout: test, key or race first, then a run, else the first entry", () => {
+  const m = buildModel(data, "2026-10-23");
+  assert.equal(primaryWorkout(m.byDate.get("2026-10-21")).id, 2);
+  assert.equal(primaryWorkout(m.byDate.get("2026-10-20")), null);
+  const gymOnly = { date: "2026-10-24", workouts: [{ id: 9, type: "run", sport: "WeightTraining" }] };
+  assert.equal(primaryWorkout(gymOnly).id, 9);
 });
 
 test("links to intervals.icu", () => {

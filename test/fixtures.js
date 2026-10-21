@@ -12,7 +12,7 @@ export const steps10x400 = [
 ];
 
 const workout = (id, date, name, distance, steps = [], description = "") => ({
-  id, date, category: "WORKOUT", name, description, distance, movingTime: Math.round(distance * 0.34),
+  id, date, category: "WORKOUT", sport: "Run", name, description, distance, movingTime: Math.round(distance * 0.34),
   pairedActivityId: null, steps,
 });
 

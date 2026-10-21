@@ -21,7 +21,7 @@ intervals.icu (for example new paces after a test) show up the next time the pag
 ## One-time GitHub setup
 
 1. Make the repository public (Settings → General → Danger Zone → Change visibility). GitHub Pages on
-   a free account needs a public repository; this repository contains no personal data.
+   a free account needs a public repository; this repository contains no API key, plan or run data.
 2. Settings → Pages → Build and deployment → Source: **GitHub Actions**.
 3. Push to `main`. `.github/workflows/pages.yml` runs the tests and publishes the `site/` folder.
 
@@ -33,7 +33,11 @@ intervals.icu (for example new paces after a test) show up the next time the pag
   this device** removes them. To revoke the key everywhere, clear it in intervals.icu → Settings →
   Developer Settings.
 - The page only reads from intervals.icu and only talks to `https://intervals.icu` (enforced by its
-  Content Security Policy).
+  Content Security Policy). The key itself, though, gives full access to your intervals.icu account.
+- All GitHub Pages sites of one account share the origin `https://trinhvinhtruong96.github.io`, and
+  with it the browser's local storage. Any other Pages site you publish under this account (and any
+  third-party script it loads) could read the saved key. Keep other Pages sites free of third-party
+  scripts, or host this page on its own domain.
 
 ## Develop
 

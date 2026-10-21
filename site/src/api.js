@@ -135,6 +135,7 @@ export function reduceEvent(e) {
     distance: e.distance ?? 0,
     movingTime: e.moving_time ?? 0,
     pairedActivityId: e.paired_activity_id ?? null,
+    sport: e.type ?? "",
     steps: (e.workout_doc?.steps ?? []).map(reduceStep),
   };
 }
@@ -177,6 +178,7 @@ export async function refresh({ store, today, fetchImpl = defaultFetch, plan = P
     events: (Array.isArray(events) ? events : []).map(reduceEvent),
     activities: (Array.isArray(activities) ? activities : []).map(reduceActivity),
   };
-  store.setCache(data);
+  // Forget key (or a new key) while this was loading: don't bring the old data back.
+  if (store.getKey() === key) store.setCache(data);
   return data;
 }

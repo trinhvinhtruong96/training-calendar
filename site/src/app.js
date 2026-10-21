@@ -3,7 +3,7 @@ import { PLAN } from "./config.js";
 import { KeyError, NetworkError, connect, createStore, refresh } from "./api.js";
 import { WEEKDAYS, addDays, clampWeek, formatDate, formatDuration, formatKm, localToday, timeAgo, weekNumber } from "./dates.js";
 import { GROUP, TYPE_LABEL, formatStepAmount, noteText, paceRange, shortName, stepLevel, stepName, workoutBar } from "./workout.js";
-import { buildModel, dayLabel, dayUrl, headerInfo, runSummary, statusInfo } from "./model.js";
+import { buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, runSummary, statusInfo } from "./model.js";
 
 let storage = null;
 try {
@@ -29,6 +29,7 @@ const state = {
   hiddenAt: 0,
   detailsDate: null,
   opener: null,
+  session: 0, // bumped on Forget / new key so late refresh results are dropped
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -214,7 +215,7 @@ function renderToday() {
 }
 
 function previewButton(day, label) {
-  const w = day.workouts[0];
+  const w = primaryWorkout(day);
   return h("button", {
     type: "button", class: `preview g-${GROUP[w.type]}`, "data-key": `preview:${day.date}`,
     onclick: e => openDetails(day.date, e.currentTarget),
@@ -333,7 +334,7 @@ function kmMeter(doneM, plannedM) {
 
 function weekRow(d) {
   const st = statusInfo(d, state.today);
-  const w = d.workouts[0];
+  const w = primaryWorkout(d);
   const group = w ? GROUP[w.type] : d.notes.length ? "rest" : "empty";
   const name = w
     ? shortName(w.name) + (d.workouts.length > 1 ? ` +${d.workouts.length - 1}` : "")
@@ -423,7 +424,7 @@ function renderPlan() {
 
 function gridCell(d) {
   const st = statusInfo(d, state.today);
-  const w = d.workouts[0];
+  const w = primaryWorkout(d);
   const group = w ? GROUP[w.type] : d.notes.length ? "rest" : "empty";
   const mark = w ? MARKS[w.type] ?? "" : "";
   const cls = ["cell", `g-${group}`, `s-${st.key}`, d.isToday && "is-today", d.date < state.today && "is-past"].filter(Boolean).join(" ");
@@ -562,13 +563,19 @@ function openSettings() {
   settings.querySelector('[data-action="close"]').focus();
 }
 
+function resetSession() {
+  state.session += 1;
+  state.status = { kind: "idle", message: "" };
+  state.data = null;
+  state.model = null;
+  state.viewWeek = null;
+}
+
 function forgetKey() {
   if (!window.confirm("Forget the API key and saved data on this device?")) return;
   store.forget();
   settings.close();
-  state.data = null;
-  state.model = null;
-  state.viewWeek = null;
+  resetSession();
   renderSetup("");
   announce("Key removed from this device");
 }
@@ -655,11 +662,9 @@ function renderSetup(message) {
     submit.textContent = "Connecting…";
     error.textContent = "";
     try {
+      resetSession();
       await connect(input.value, { store });
       state.data = store.getCache();
-      state.model = null;
-      state.viewWeek = null;
-      state.status = { kind: "idle", message: "" };
       renderLoading();
       await doRefresh();
       announce("Connected. Calendar loaded.");
@@ -706,23 +711,28 @@ function renderError(message) {
       h("p", { class: "error", role: "alert", text: message }),
       h("div", { class: "row" },
         h("button", { type: "button", class: "btn primary", onclick: () => { renderLoading(); doRefresh(); } }, "Try again"),
-        h("button", { type: "button", class: "btn ghost", onclick: () => { store.forget(); renderSetup(""); } }, "Use a different key")))));
+        h("button", { type: "button", class: "btn ghost", onclick: () => { store.forget(); resetSession(); renderSetup(""); } }, "Use a different key")))));
 }
 
 // ---------- data ----------
 async function doRefresh({ announceResult = false } = {}) {
   if (state.status.kind === "loading") return;
+  const session = state.session;
   state.status = { kind: "loading", message: "" };
   updateStatus();
   try {
-    state.data = await refresh({ store, today: localToday() });
+    const data = await refresh({ store, today: localToday() });
+    if (session !== state.session) return;
+    state.data = data;
     state.status = { kind: "ok", message: "" };
     rebuild();
     render();
     if (announceResult) announce("Calendar updated");
   } catch (err) {
+    if (session !== state.session) return;
     if (err instanceof KeyError) {
       state.status = { kind: "idle", message: "" };
+      state.model = null;
       renderSetup(err.reason === "missing" ? "" : "Your key was not accepted. Paste a current key from intervals.icu.");
       return;
     }
@@ -743,12 +753,13 @@ function onVisibility() {
     return;
   }
   if (!store.getKey() || !state.model) return;
-  if (localToday() !== state.today) {
+  const dayChanged = localToday() !== state.today;
+  if (dayChanged) {
     state.viewWeek = null;
     rebuild();
     render();
   }
-  if (state.hiddenAt && Date.now() - state.hiddenAt > 5 * 60_000) doRefresh();
+  if (dayChanged || (state.hiddenAt && Date.now() - state.hiddenAt > 5 * 60_000)) doRefresh();
 }
 
 function tick() {
@@ -757,6 +768,7 @@ function tick() {
     state.viewWeek = null;
     rebuild();
     render();
+    if (store.getKey()) doRefresh();
   } else {
     updateStatus();
   }

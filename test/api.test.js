@@ -40,7 +40,7 @@ function fakeFetch(routes) {
 
 const rawEvent = {
   id: 2, start_date_local: "2026-10-21T00:00:00", category: "WORKOUT", name: "W01 Wed - 10x400 @4:05",
-  description: "+ gym", distance: 5600, moving_time: 2424, paired_activity_id: null, external_id: "x-2026-10-21",
+  description: "+ gym", distance: 5600, moving_time: 2424, paired_activity_id: null, external_id: "x-2026-10-21", type: "Run",
   icu_ctl: 40, oauth_client_id: null,
   workout_doc: {
     distance: 5600,
@@ -91,7 +91,7 @@ test("request turns failures into clear errors", async () => {
 test("events and activities are reduced to the fields the page uses", () => {
   assert.deepEqual(reduceEvent(rawEvent), {
     id: 2, date: "2026-10-21", category: "WORKOUT", name: "W01 Wed - 10x400 @4:05", description: "+ gym",
-    distance: 5600, movingTime: 2424, pairedActivityId: null,
+    distance: 5600, movingTime: 2424, pairedActivityId: null, sport: "Run",
     steps: [
       { text: "Warmup", distance: 1600, duration: 544, pace: { start: 330, end: 350, units: "secs/km" } },
       {
@@ -177,6 +177,18 @@ test("store survives blocked storage and corrupt data", () => {
   const storage = memoryStorage();
   storage.setItem("tc.v1.data", "{not json");
   assert.equal(createStore(storage).getCache(), null);
+});
+
+test("refresh does not save data when the key is removed while it loads", async () => {
+  const store = createStore(memoryStorage());
+  store.setKey("secret-key");
+  const forgetMidway = async () => {
+    store.forget();
+    return reply(200, []);
+  };
+  await refresh({ store, today: "2026-10-21", fetchImpl: forgetMidway });
+  assert.equal(store.getKey(), null);
+  assert.equal(store.getCache(), null);
 });
 
 test("forget removes the key and the saved data but keeps settings", () => {
