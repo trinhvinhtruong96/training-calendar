@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://intervals.icu; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>HM sub-1:30 · Training calendar</title>
+  <meta name="description" content="HM sub-1:30 training plan, today's workout and your runs, live from intervals.icu.">
+  <meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0f1c" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="HM 1:30">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="src/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#today">Skip to today</a>
+  <div id="app" aria-busy="true">
+    <main id="main" class="setup"><section class="card setup-card"><p>Loading…</p></section></main>
+  </div>
+  <div id="live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <dialog id="details" class="sheet" aria-labelledby="details-title">
+    <div class="sheet-inner">
+      <div class="sheet-grip" aria-hidden="true"><span></span></div>
+      <div class="sheet-head">
+        <div>
+          <p class="eyebrow" id="details-eyebrow"></p>
+          <h2 id="details-title"></h2>
+        </div>
+        <button type="button" class="icon-btn" data-action="close" aria-label="Close">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-body" id="details-body"></div>
+      <div class="sheet-foot">
+        <button type="button" class="btn ghost" data-action="prev"><span aria-hidden="true">‹</span> Previous day</button>
+        <button type="button" class="btn ghost" data-action="next">Next day <span aria-hidden="true">›</span></button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="settings" class="modal" aria-labelledby="settings-title">
+    <div class="modal-inner">
+      <div class="sheet-head">
+        <h2 id="settings-title">Settings</h2>
+        <button type="button" class="icon-btn" data-action="close" aria-label="Close">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <p id="settings-athlete" class="muted"></p>
+      <fieldset class="field">
+        <legend>Theme</legend>
+        <div class="segmented">
+          <label><input type="radio" name="theme" value="system"> System</label>
+          <label><input type="radio" name="theme" value="light"> Light</label>
+          <label><input type="radio" name="theme" value="dark"> Dark</label>
+        </div>
+      </fieldset>
+      <label class="switch"><input type="checkbox" name="shortcut"> Press <kbd>T</kbd> to jump to today</label>
+      <div class="settings-actions">
+        <button type="button" class="btn" data-action="refresh">Refresh now</button>
+        <button type="button" class="btn danger" data-action="forget">Forget key on this device</button>
+      </div>
+      <p class="muted small">The key is stored only in this browser. To revoke it everywhere, clear the API key in <a href="https://intervals.icu/settings" target="_blank" rel="noopener noreferrer">intervals.icu settings<span class="sr-only"> (opens in a new tab)</span></a> under Developer Settings.</p>
+    </div>
+  </dialog>
+</body>
+</html>
