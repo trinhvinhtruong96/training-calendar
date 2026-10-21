@@ -2,8 +2,7 @@
 
 A small web page for the HM sub-2:00 plan (20 Oct 2026 → race on Sun 31 Jan 2027). It shows today's
 workout, this week, all 15 weeks with today highlighted, and your completed runs next to each planned
-workout. A Fitness row shows Garmin's VO2 max (with its level and trend) and a race predictor for 5K, 10K,
-half and marathon. Everything is read live from [intervals.icu](https://intervals.icu) in your browser.
+workout. Everything is read live from [intervals.icu](https://intervals.icu) in your browser.
 
 Live site: <https://trinhvinhtruong96.github.io/training-calendar/>
 
@@ -54,7 +53,6 @@ npm run serve   # http://localhost:8080
 | `site/index.html`, `site/styles.css` | Page shell and styles (light/dark, phone/PC) |
 | `site/src/config.js` | Plan dates, title and phase names |
 | `site/src/dates.js`, `workout.js`, `model.js` | Pure logic: dates, workouts, days/weeks/statuses |
-| `site/src/fitness.js` | Pure logic: VO2 max levels and trends, race predictions |
 | `site/src/api.js` | Read-only intervals.icu client and browser storage |
 | `site/src/app.js` | Rendering and interaction |
 | `site/sw.js`, `site/manifest.webmanifest`, `site/icons/` | Offline support and home-screen app |

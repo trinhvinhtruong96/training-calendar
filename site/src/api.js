@@ -1,9 +1,5 @@
 // Read-only intervals.icu client and the browser-side store (key, cached data, settings).
 import { API_BASE, PLAN, STORAGE_KEYS } from "./config.js";
-import { addDays } from "./dates.js";
-import { RACES, allPredictorDates, windowRange } from "./fitness.js";
-
-const WELLNESS_DAYS = 400; // enough for the 6-month VO2 max chart and the 1-year race-predictor history
 
 export class KeyError extends Error {
   constructor(message = "Key not accepted", reason = "rejected") {
@@ -158,29 +154,6 @@ export function reduceActivity(a) {
   };
 }
 
-export function reduceWellness(rows) {
-  return (Array.isArray(rows) ? rows : [])
-    .filter(r => r.vo2max > 0)
-    .map(r => ({ date: String(r.id).slice(0, 10), vo2max: r.vo2max }))
-    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-}
-
-// One entry per requested 12-week window: critical-speed model and real best times at the race distances.
-export function reducePaceCurves(reply) {
-  return (reply?.list ?? []).map(c => {
-    const fromId = String(c.id ?? "").split(".")[2];
-    const end = /^\d{4}-\d{2}-\d{2}$/.test(fromId ?? "") ? fromId : String(c.end_date_local ?? "").slice(0, 10);
-    const model = (c.paceModels ?? []).find(m => m.type === "CS");
-    const best = {};
-    (c.distance ?? []).forEach((d, i) => {
-      const race = RACES.find(r => Math.abs(d - r.metres) <= 1);
-      if (race && c.values?.[i] > 0) best[race.metres] = c.values[i];
-    });
-    const runs = new Set((c.activity_id ?? []).filter(Boolean)).size;
-    return { end, cs: model?.criticalSpeed ?? null, dPrime: model?.dPrime ?? null, best, runs };
-  });
-}
-
 export async function connect(rawKey, { store, fetchImpl = defaultFetch }) {
   const key = String(rawKey ?? "").trim();
   if (!KEY_PATTERN.test(key)) throw new KeyError("That doesn't look like an intervals.icu API key.", "format");
@@ -195,25 +168,15 @@ export async function refresh({ store, today, fetchImpl = defaultFetch, plan = P
   const key = store.getKey();
   if (!key) throw new KeyError("No API key on this device", "missing");
   const newest = today < plan.calendarStart ? plan.calendarStart : today;
-  const curves = allPredictorDates(today).map(windowRange).join(",");
-  const fitness = Promise.allSettled([
-    request(`/athlete/0/wellness?oldest=${addDays(today, -WELLNESS_DAYS)}&newest=${today}&fields=id,vo2max`, key, fetchImpl),
-    request(`/athlete/0/pace-curves.json?type=Run&curves=${curves}`, key, fetchImpl),
-  ]);
   const [events, activities] = await Promise.all([
     request(`/athlete/0/events?oldest=${plan.calendarStart}&newest=${plan.raceDay}`, key, fetchImpl),
     request(`/athlete/0/activities?oldest=${plan.calendarStart}&newest=${newest}`, key, fetchImpl),
   ]);
-  // Fitness data is nice to have: if either request fails, keep what we had.
-  const [wellness, paces] = await fitness;
-  const prev = store.getCache();
   const data = {
     fetchedAt: now.toISOString(),
-    athleteName: prev?.athleteName ?? "",
+    athleteName: store.getCache()?.athleteName ?? "",
     events: (Array.isArray(events) ? events : []).map(reduceEvent),
     activities: (Array.isArray(activities) ? activities : []).map(reduceActivity),
-    vo2: wellness.status === "fulfilled" ? reduceWellness(wellness.value) : prev?.vo2 ?? [],
-    paceWindows: paces.status === "fulfilled" ? reducePaceCurves(paces.value) : prev?.paceWindows ?? [],
   };
   // Forget key (or a new key) while this was loading: don't bring the old data back.
   if (store.getKey() === key) store.setCache(data);

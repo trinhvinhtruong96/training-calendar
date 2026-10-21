@@ -1,6 +1,6 @@
 // Offline copy of the app files. Never touches intervals.icu requests.
 // Cache-first, refreshed in the background so a new deploy shows on the next visit.
-const CACHE = "tc-shell-v2";
+const CACHE = "tc-shell-v1";
 const FILES = [
   "./",
   "index.html",
@@ -10,7 +10,6 @@ const FILES = [
   "src/api.js",
   "src/config.js",
   "src/dates.js",
-  "src/fitness.js",
   "src/model.js",
   "src/workout.js",
   "icons/icon.svg",

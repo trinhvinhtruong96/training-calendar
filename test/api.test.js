@@ -1,8 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  HttpError, KeyError, NetworkError, authHeader, connect, createStore, reduceActivity, reduceEvent, reducePaceCurves,
-  reduceWellness, refresh, request,
+  HttpError, KeyError, NetworkError, authHeader, connect, createStore, reduceActivity, reduceEvent, refresh, request,
 } from "../site/src/api.js";
 
 const BASE = "https://intervals.icu/api/v1";
@@ -119,69 +118,16 @@ test("refresh loads the plan range and caches a reduced copy", async () => {
     "/athlete/0/activities": reply(200, [rawActivity]),
   });
   const data = await refresh({ store, today: "2026-10-21", fetchImpl: f, now: new Date("2026-10-21T03:00:00Z") });
-  const urls = f.calls.map(c => c.url);
-  assert.ok(urls.includes(`${BASE}/athlete/0/activities?oldest=2026-10-19&newest=2026-10-21`));
-  assert.ok(urls.includes(`${BASE}/athlete/0/events?oldest=2026-10-19&newest=2027-01-31`));
+  assert.deepEqual(f.calls.map(c => c.url).sort(), [
+    `${BASE}/athlete/0/activities?oldest=2026-10-19&newest=2026-10-21`,
+    `${BASE}/athlete/0/events?oldest=2026-10-19&newest=2027-01-31`,
+  ]);
   assert.equal(data.fetchedAt, "2026-10-21T03:00:00.000Z");
   assert.equal(data.athleteName, "Runner");
   assert.equal(data.events[0].date, "2026-10-21");
   assert.equal(data.activities[0].id, "i11");
   assert.equal("icu_ctl" in data.events[0], false);
   assert.deepEqual(store.getCache(), data);
-});
-
-const rawCurve = {
-  id: "r.2026-07-30.2026-10-21", label: "84 days", distance: [400, 5000, 10000, 21000], values: [80, 1279, 2592, 5712],
-  paceModels: [{ type: "CS", criticalSpeed: 3.807, dPrime: 131, r2: 0.999 }], activity_id: ["a", "b", "c", "d"],
-};
-
-test("refresh also loads VO2 max and the 12-week pace curves for every history date", async () => {
-  const store = createStore(memoryStorage());
-  store.setKey("secret-key");
-  const f = fakeFetch({
-    "/athlete/0/events": reply(200, []),
-    "/athlete/0/activities": reply(200, []),
-    "/athlete/0/wellness": reply(200, [{ id: "2026-10-18", vo2max: 58 }, { id: "2026-10-19" }, { id: "2026-10-17", vo2max: 57 }]),
-    "/athlete/0/pace-curves.json": reply(200, { list: [rawCurve], activities: {} }),
-  });
-  const data = await refresh({ store, today: "2026-10-21", fetchImpl: f });
-  const urls = f.calls.map(c => c.url);
-  assert.ok(urls.includes(`${BASE}/athlete/0/wellness?oldest=2025-09-16&newest=2026-10-21&fields=id,vo2max`));
-  const pace = urls.find(u => u.includes("/pace-curves.json"));
-  assert.ok(pace.startsWith(`${BASE}/athlete/0/pace-curves.json?type=Run&curves=r.`), pace);
-  assert.ok(pace.includes("r.2026-07-30.2026-10-21"));
-  assert.ok(pace.includes("r.2025-07-31.2025-10-22"), "oldest 1Y point");
-  assert.deepEqual(data.vo2, [{ date: "2026-10-17", vo2max: 57 }, { date: "2026-10-18", vo2max: 58 }]);
-  assert.deepEqual(data.paceWindows, [{ end: "2026-10-21", cs: 3.807, dPrime: 131, best: { 5000: 1279, 10000: 2592 }, runs: 4 }]);
-  assert.deepEqual(store.getCache().vo2, data.vo2);
-});
-
-test("a failed VO2 max or pace-curve request keeps the previous values and the refresh still succeeds", async () => {
-  const store = createStore(memoryStorage());
-  store.setKey("secret-key");
-  const vo2 = [{ date: "2026-10-01", vo2max: 57 }];
-  const paceWindows = [{ end: "2026-10-14", cs: 3.8, dPrime: 130, best: {} }];
-  store.setCache({ fetchedAt: null, athleteName: "", events: [], activities: [], vo2, paceWindows });
-  const f = fakeFetch({
-    "/athlete/0/events": reply(200, []),
-    "/athlete/0/activities": reply(200, []),
-    "/athlete/0/wellness": reply(500, "oops"),
-    "/athlete/0/pace-curves.json": new TypeError("Failed to fetch"),
-  });
-  const data = await refresh({ store, today: "2026-10-21", fetchImpl: f });
-  assert.deepEqual(data.vo2, vo2);
-  assert.deepEqual(data.paceWindows, paceWindows);
-});
-
-test("wellness and pace-curve replies are reduced to what the page uses", () => {
-  assert.deepEqual(reduceWellness([{ id: "2026-10-02", vo2max: 57.5, restingHR: 50 }, { id: "2026-10-01", vo2max: 0 }, { id: "2026-09-30" }]), [
-    { date: "2026-10-02", vo2max: 57.5 },
-  ]);
-  assert.deepEqual(reduceWellness(null), []);
-  assert.deepEqual(reducePaceCurves({ list: [{ id: "84d", end_date_local: "2026-10-22T00:00:00", distance: [], values: [] }] }), [
-    { end: "2026-10-22", cs: null, dPrime: null, best: {}, runs: 0 },
-  ]);
-  assert.deepEqual(reducePaceCurves(null), []);
 });
 
 test("refresh before the plan starts still asks for a valid activity range", async () => {

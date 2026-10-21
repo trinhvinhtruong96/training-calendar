@@ -230,35 +230,7 @@ deploy shows on the next visit; it never stores intervals.icu responses.
 
 One-time user steps (README): make the repo public; Settings → Pages → Source: GitHub Actions; push.
 
-## 11a. Fitness row (added 2026-10-21)
-
-Two cards between This week and Plan (side by side ≥ 1024 px, stacked below).
-
-**Data** (read-only, fetched with every refresh; if either request fails the previous values are kept and
-the refresh still succeeds):
-- `GET /athlete/0/wellness?oldest=<today−400d>&newest=<today>&fields=id,vo2max` → cached as `vo2: [{date, vo2max}]`.
-- `GET /athlete/0/pace-curves.json?type=Run&curves=<r.<from>.<to>,…>`: one 84-day window ending on each history
-  date (see below), one request → cached as `paceWindows: [{end, cs, dPrime, best: {metres: seconds}, runs}]`
-  from the window's critical-speed model, its best times at 5000 / 10000 / 21097.5 / 42195 m, and its number of runs.
-
-**VO2 max card.** Tabs Current / 4W / 12W / 6M. Current: latest value, change over 28 days, level and a 5-step
-gauge from Garmin's table (The Cooper Institute) for `ATHLETE = {sex: "male", ageBand: "30-39"}` in
-`config.js`; the birth date is not stored (public repo). Other tabs: line chart of the period (weekly average for
-12W and 6M), level bands in the background, first and last value, change, low and high.
-
-**Race predictor card.** Tabs Current / 4W / 6M / 1Y; 5K, 10K, Half, Marathon.
-- *Real runs* (main): 5K and 10K = `(d − D′) / CS` from the 84-day window; Half and Marathon = Riegel
-  (`t₂ = t₁ · (d₂/d₁)^1.06`) from that 10K; a real best time in the window replaces any prediction it beats.
-  No prediction from a window with fewer than 3 runs.
-- *VO2 max* (secondary): Jack Daniels' VDOT formula with Garmin's VO2 max on that date.
-- History: points every 7 days (4W, 5 points), 14 days (6M, 14 points), 28 days (1Y, 14 points), each using the
-  84 days before it; chart of both lines for the chosen distance (faster at the top) and the change.
-
-**Accessibility.** Tabs are native radio groups (arrow keys). Each chart is `role="img"` with a spoken
-summary, plus a visually hidden data table.
-
 ## 12. Out of scope
 
 Editing or uploading workouts from the page; gym logging; notifications; more than one athlete or plan;
-OAuth login; syncing ticks between devices (there are none, runs come from intervals.icu); Garmin's own race
-predictor (not available through intervals.icu).
+OAuth login; syncing ticks between devices (there are none, runs come from intervals.icu).
