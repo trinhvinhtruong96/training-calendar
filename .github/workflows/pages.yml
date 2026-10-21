@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: 24
       - run: npm test
+      # A new offline-cache name for every deploy, so visitors never mix files from two versions.
+      - run: sed -i "s/const CACHE = \"tc-shell-[^\"]*\";/const CACHE = \"tc-shell-${GITHUB_SHA::12}\";/" site/sw.js && grep -n "const CACHE" site/sw.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

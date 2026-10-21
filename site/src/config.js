@@ -11,6 +11,9 @@ export const PLAN = Object.freeze({
   ]),
 });
 
+// For the VO2 max fitness level only. Kept to sex and age band (no birth date) because the repo is public.
+export const ATHLETE = Object.freeze({ sex: "male", ageBand: "30-39" });
+
 export const API_BASE = "https://intervals.icu/api/v1";
 
 export const STORAGE_KEYS = Object.freeze({

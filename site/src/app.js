@@ -1,11 +1,15 @@
 // The page: rendering and interaction. All data logic lives in the pure modules.
-import { PLAN } from "./config.js";
+import { ATHLETE, PLAN } from "./config.js";
 import { KeyError, NetworkError, connect, createStore, refresh } from "./api.js";
 import {
-  WEEKDAYS, addDays, clampWeek, formatDate, formatDuration, formatKm, formatShortRange, localToday, timeAgo, weekNumber,
+  WEEKDAYS, addDays, clampWeek, diffDays, formatClock, formatDate, formatDuration, formatKm, formatPace, formatShortRange,
+  localToday, timeAgo, weekNumber,
 } from "./dates.js";
 import { GROUP, TYPE_LABEL, formatStepAmount, noteText, paceRange, shortName, stepLevel, stepName, workoutBar } from "./workout.js";
 import { buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, resultText, runSummary, statusInfo } from "./model.js";
+import {
+  LEVELS, RACES, formatDelta, predictionSeries, predictorDates, vo2At, vo2Change, vo2Level, vo2Series,
+} from "./fitness.js";
 
 let storage = null;
 try {
@@ -33,6 +37,7 @@ const state = {
   opener: null,
   session: 0, // bumped on Forget / new key so late refresh results are dropped
   openWeeks: null, // week numbers expanded in the phone plan list
+  fitness: { vo2: "current", race: "current", distance: "half" }, // selected tabs
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -111,7 +116,7 @@ function render() {
   const activeKey = active && app.contains(active) ? active.dataset.key : null;
   app.replaceChildren(
     renderHeader(),
-    h("main", { id: "main", class: "layout" }, renderToday(), renderWeek(), renderPlan()),
+    h("main", { id: "main", class: "layout" }, renderToday(), renderWeek(), renderVo2(), renderPredictor(), renderPlan()),
     h("button", { type: "button", class: "fab", "data-key": "btn:fab", onclick: goToToday }, "Today"),
   );
   app.removeAttribute("aria-busy");
@@ -402,6 +407,278 @@ function bindSwipe(el, onSwipe) {
     e.preventDefault();
     e.stopPropagation();
   }, true);
+}
+
+// ---------- fitness: VO2 max and race predictor ----------
+function periodTabs(name, options, value, label, onChange) {
+  return h("fieldset", { class: "segmented tabs" },
+    h("legend", { class: "sr-only", text: label }),
+    options.map(([v, text]) => h("label", {},
+      h("input", { type: "radio", name, value: v, checked: v === value, "data-key": `${name}:${v}`, onchange: () => onChange(v) }),
+      text)));
+}
+
+const fmtVo2 = v => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+// The date the fitness data was fetched for (pace windows end on that day).
+const dataDay = () => (state.data?.fetchedAt ? localToday(new Date(state.data.fetchedAt)) : state.today);
+
+function renderVo2() {
+  const points = state.data?.vo2 ?? [];
+  const tab = state.fitness.vo2;
+  const card = h("section", { class: "card fit vo2", "aria-labelledby": "vo2-title" },
+    h("div", { class: "section-head" },
+      h("div", {},
+        h("h2", { id: "vo2-title", text: "VO2 max" }),
+        h("p", { class: "muted small", text: "From your Garmin, via intervals.icu" }))),
+    periodTabs("vo2tab", [["current", "Current"], ["28", "4W"], ["84", "12W"], ["182", "6M"]], tab, "VO2 max period", v => {
+      state.fitness.vo2 = v;
+      render();
+    }));
+  if (!points.length) {
+    card.append(h("p", { class: "muted", text: "No VO2 max from Garmin yet." }));
+    return card;
+  }
+  card.append(tab === "current" ? vo2Current(points) : vo2History(points, Number(tab)));
+  return card;
+}
+
+function vo2Current(points) {
+  const value = vo2At(points, state.today) ?? points.at(-1).vo2max;
+  const level = vo2Level(value, ATHLETE);
+  const change = vo2Change(points, state.today, 28);
+  const delta = change?.delta ?? 0;
+  const changeText = delta > 0 ? `▲ +${fmtVo2(delta)} in 4 weeks` : delta < 0 ? `▼ −${fmtVo2(-delta)} in 4 weeks` : "No change in 4 weeks";
+  const group = ATHLETE.sex === "male" ? "men" : "women";
+  const t = level.thresholds;
+  return h("div", { class: "vo2-now" },
+    h("p", { class: "vo2-big" },
+      h("span", { class: "vo2-num", text: fmtVo2(value) }),
+      h("span", { class: "vo2-side" },
+        h("span", { class: "vo2-unit", text: "ml/kg/min" }),
+        h("span", { class: `vo2-change ${delta > 0 ? "up" : delta < 0 ? "down" : ""}`, text: changeText }))),
+    h("p", { class: `vo2-level lvl-${level.key}` },
+      h("strong", { text: level.label }), ` for ${group} ${ATHLETE.ageBand.replace("-", "–")}`),
+    h("div", { class: "gauge", "aria-hidden": "true" },
+      LEVELS.map(l => h("span", { class: `gauge-seg lvl-${l.key}` })),
+      h("span", { class: "gauge-marker", style: { "--pos": `${(level.position * 100).toFixed(1)}%` } })),
+    h("p", { class: "gauge-labels", "aria-hidden": "true" },
+      ["Poor", `Fair ${t.fair}`, `Good ${t.good}`, `Excellent ${t.excellent}`, `Superior ${t.superior}`].map(text => h("span", { text }))),
+    h("p", { class: "muted small", text: `Latest value from ${formatDate(points.at(-1).date)}.` }));
+}
+
+function vo2History(points, days) {
+  const series = vo2Series(points, state.today, days);
+  if (series.length < 2) return h("p", { class: "muted", text: "Not enough VO2 max values in this period." });
+  const start = addDays(state.today, -days);
+  const values = series.map(p => p.vo2max);
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const yMin = Math.floor(lo) - 1;
+  const yMax = Math.ceil(hi) + 1;
+  const t = vo2Level(lo, ATHLETE).thresholds;
+  const edges = [[-Infinity, t.fair, "poor"], [t.fair, t.good, "fair"], [t.good, t.excellent, "good"], [t.excellent, t.superior, "excellent"], [t.superior, Infinity, "superior"]];
+  const first = series[0];
+  const last = series.at(-1);
+  const delta = Math.round((last.vo2max - first.vo2max) * 10) / 10;
+  const period = { 28: "4 weeks", 84: "12 weeks", 182: "6 months" }[days];
+  const summary = `VO2 max over ${period}: ${fmtVo2(first.vo2max)} on ${formatDate(first.date)} to ${fmtVo2(last.vo2max)} on ${formatDate(last.date)}, lowest ${fmtVo2(lo)}, highest ${fmtVo2(hi)}.`;
+  return h("div", { class: "fit-history" },
+    lineChart({
+      xMax: days,
+      yMin,
+      yMax,
+      label: summary,
+      bands: edges.map(([from, to, key]) => ({ from, to, cls: `band lvl-${key}`, text: LEVELS.find(l => l.key === key).label })),
+      lines: [{ cls: "line line-vo2", points: (days > 28 ? weeklyAverage(series, start) : series).map(p => [diffDays(start, p.date), p.vo2max]) }],
+      ticks: niceTicks(yMin, yMax, [1, 2, 5]),
+      yFormat: v => String(v),
+      startLabel: `${formatDate(first.date)} · ${fmtVo2(first.vo2max)}`,
+      endLabel: `${formatDate(last.date)} · ${fmtVo2(last.vo2max)}`,
+    }),
+    h("p", { class: "fit-summary", "aria-hidden": "true" },
+      h("strong", { text: delta > 0 ? `+${fmtVo2(delta)}` : delta < 0 ? `−${fmtVo2(-delta)}` : "±0" }),
+      ` since ${formatDate(first.date)} · low ${fmtVo2(lo)} · high ${fmtVo2(hi)}`),
+    dataTable(`VO2 max, ${period}`, ["Date", "VO2 max"], weekly(series).map(p => [formatDate(p.date), fmtVo2(p.vo2max)])));
+}
+
+// Average per 7-day step (placed on the step's last day), so daily 57↔58 flips don't look like spikes.
+function weeklyAverage(series, start) {
+  const steps = new Map();
+  for (const p of series) {
+    const k = Math.floor(diffDays(start, p.date) / 7);
+    const s = steps.get(k) ?? { sum: 0, n: 0, date: p.date };
+    s.sum += p.vo2max;
+    s.n += 1;
+    s.date = p.date;
+    steps.set(k, s);
+  }
+  return [...steps.values()].map(s => ({ date: s.date, vo2max: s.sum / s.n }));
+}
+
+// Round tick values: the smallest step from `steps` that gives at most 4 intervals.
+function niceTicks(min, max, steps) {
+  const step = steps.find(s => (max - min) / s <= 4) ?? steps.at(-1);
+  const ticks = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) ticks.push(v);
+  return ticks.length ? ticks : [min, max];
+}
+
+// Last value of each 7-day step, so the hidden table stays short.
+function weekly(series) {
+  const out = [];
+  for (const p of series) {
+    if (out.length && diffDays(out.at(-1).date, p.date) < 7) out[out.length - 1] = p;
+    else out.push(p);
+  }
+  return out;
+}
+
+function dataTable(caption, head, rows) {
+  return h("table", { class: "sr-only" },
+    h("caption", { text: caption }),
+    h("thead", {}, h("tr", {}, head.map(text => h("th", { scope: "col", text })))),
+    h("tbody", {}, rows.map(r => h("tr", {}, r.map(text => h("td", { text }))))));
+}
+
+function renderPredictor() {
+  const windows = state.data?.paceWindows ?? [];
+  const vo2 = state.data?.vo2 ?? [];
+  const tab = state.fitness.race;
+  const card = h("section", { class: "card fit race", "aria-labelledby": "race-title" },
+    h("div", { class: "section-head" },
+      h("div", {},
+        h("h2", { id: "race-title", text: "Race predictor" }),
+        h("p", { class: "muted small", text: "Real runs and VO2 max, side by side" }))),
+    periodTabs("racetab", [["current", "Current"], ["4w", "4W"], ["6m", "6M"], ["1y", "1Y"]], tab, "Race predictor period", v => {
+      state.fitness.race = v;
+      render();
+    }));
+  if (!windows.length && !vo2.length) {
+    card.append(h("p", { class: "muted", text: "No pace data from intervals.icu yet." }));
+    return card;
+  }
+  card.append(tab === "current" ? predictorNow(windows, vo2) : predictorHistory(windows, vo2, tab));
+  card.append(h("p", {
+    class: "muted small fit-note",
+    text: "Real runs: fitted to your fastest efforts in the 12 weeks before each date (at least 3 runs needed); Half and Marathon come from the 10K (Riegel's formula), or your real time if it was faster. VO2 max: Jack Daniels' formula from Garmin's value, usually optimistic.",
+  }));
+  return card;
+}
+
+function predictorNow(windows, vo2) {
+  const day = dataDay();
+  const latest = [...windows].filter(w => w.end <= day).sort((a, b) => (a.end < b.end ? -1 : 1)).at(-1);
+  const [now] = predictionSeries([latest?.end ?? day], windows, vo2);
+  const vo2Now = predictionSeries([day], [], vo2)[0];
+  const cell = (seconds, metres, cls) => (seconds
+    ? h("td", { class: cls }, h("span", { class: "race-time", text: formatClock(seconds) }), h("span", { class: "race-pace", text: `${formatPace(seconds / (metres / 1000))} /km` }))
+    : h("td", { class: `${cls} muted`, text: "—" }));
+  return h("table", { class: "race-table" },
+    h("caption", { class: "sr-only", text: "Predicted race times" }),
+    h("thead", {}, h("tr", {},
+      h("th", { scope: "col", text: "Distance" }),
+      h("th", { scope: "col", text: "Real runs" }),
+      h("th", { scope: "col", text: vo2Now.vo2max ? `VO2 max ${fmtVo2(vo2Now.vo2max)}` : "VO2 max" }))),
+    h("tbody", {}, RACES.map(r => h("tr", {},
+      h("th", { scope: "row", text: r.label }),
+      cell(now.real?.[r.key], r.metres, "race-main"),
+      cell(vo2Now.vo2?.[r.key], r.metres, "race-alt")))));
+}
+
+function predictorHistory(windows, vo2, range) {
+  const race = RACES.find(r => r.key === state.fitness.distance);
+  const series = predictionSeries(predictorDates(dataDay(), range), windows, vo2);
+  const start = series[0].date;
+  const real = series.filter(p => p.real).map(p => [diffDays(start, p.date), p.real[race.key], p.date]);
+  const fromVo2 = series.filter(p => p.vo2).map(p => [diffDays(start, p.date), p.vo2[race.key], p.date]);
+  const all = [...real, ...fromVo2].map(p => p[1]);
+  const period = { "4w": "4 weeks", "6m": "6 months", "1y": "1 year" }[range];
+  const wrap = h("div", { class: "fit-history" },
+    periodTabs("racedist", RACES.map(r => [r.key, r.label]), race.key, "Distance", v => {
+      state.fitness.distance = v;
+      render();
+    }));
+  if (!all.length) {
+    wrap.append(h("p", { class: "muted", text: "No predictions in this period." }));
+    return wrap;
+  }
+  const lo = Math.min(...all);
+  const hi = Math.max(...all);
+  const pad = Math.max(10, (hi - lo) * 0.12);
+  const change = (pts, name) => {
+    if (pts.length < 1) return null;
+    const [, a, from] = pts[0];
+    const [, b] = pts.at(-1);
+    const d = b - a;
+    return { name, text: `${formatClock(a)} → ${formatClock(b)}`, delta: d, words: `${name}: ${formatClock(a)} on ${formatDate(from)} to ${formatClock(b)} now` };
+  };
+  const changes = [change(real, "Real runs"), change(fromVo2, "VO2 max")].filter(Boolean);
+  wrap.append(
+    lineChart({
+      xMax: diffDays(start, series.at(-1).date),
+      yMin: lo - pad,
+      yMax: hi + pad,
+      invert: true,
+      label: `${race.label} prediction over ${period}. ${changes.map(c => c.words).join(". ")}.`,
+      lines: [
+        { cls: "line line-real", points: real.map(p => p.slice(0, 2)) },
+        { cls: "line line-alt", points: fromVo2.map(p => p.slice(0, 2)) },
+      ],
+      ticks: niceTicks(lo - pad, hi + pad, [30, 60, 120, 300, 600, 900, 1800, 3600]),
+      yFormat: v => formatClock(v),
+      startLabel: formatDate(start),
+      endLabel: formatDate(series.at(-1).date),
+      note: "↑ faster",
+    }),
+    h("ul", { class: "fit-changes", "aria-hidden": "true" }, changes.map(c => h("li", {},
+      h("span", { class: `key ${c.name === "Real runs" ? "key-real" : "key-alt"}` }),
+      h("span", { class: "fit-change-name", text: c.name }),
+      h("span", { class: "fit-change-text", text: c.text }),
+      h("strong", { class: c.delta < 0 ? "faster" : c.delta > 0 ? "slower" : "", text: formatDelta(c.delta) })))),
+    dataTable(`${race.label} predictions, ${period}`, ["Date", "Real runs", "VO2 max"],
+      series.map(p => [formatDate(p.date), p.real ? formatClock(p.real[race.key]) : "—", p.vo2 ? formatClock(p.vo2[race.key]) : "—"])));
+  return wrap;
+}
+
+// Small SVG line chart. Points are [x, y]; `invert` puts low values (fast times) at the top.
+function lineChart({ xMax, yMin, yMax, lines, bands = [], invert = false, label, ticks, yFormat, startLabel, endLabel, note }) {
+  const W = 400;
+  const H = 180;
+  const L = 44;
+  const R = 10;
+  const T = 12;
+  const B = 26;
+  const sx = x => L + (xMax ? x / xMax : 1) * (W - L - R);
+  const sy = y => {
+    const f = (y - yMin) / (yMax - yMin || 1);
+    return invert ? T + f * (H - T - B) : H - B - f * (H - T - B);
+  };
+  const svg = h("svg:svg", { class: "chart", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": label });
+  for (const b of bands) {
+    const from = Math.max(b.from, yMin);
+    const to = Math.min(b.to, yMax);
+    if (to <= from) continue;
+    const y1 = sy(to);
+    const y2 = sy(from);
+    svg.append(h("svg:rect", { class: b.cls, x: L, y: Math.min(y1, y2).toFixed(1), width: W - L - R, height: Math.abs(y2 - y1).toFixed(1) }));
+    svg.append(h("svg:text", { class: "band-text", x: W - R - 4, y: (Math.min(y1, y2) + 11).toFixed(1), "text-anchor": "end", text: b.text }));
+  }
+  for (const v of ticks) {
+    const y = sy(v);
+    svg.append(h("svg:line", { class: "grid", x1: L, x2: W - R, y1: y.toFixed(1), y2: y.toFixed(1) }));
+    svg.append(h("svg:text", { class: "tick", x: L - 6, y: (y + 4).toFixed(1), "text-anchor": "end", text: yFormat(Math.round(v)) }));
+  }
+  for (const line of lines) {
+    if (!line.points.length) continue;
+    const d = line.points.map(([x, y], i) => `${i ? "L" : "M"}${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join(" ");
+    svg.append(h("svg:path", { class: line.cls, d }));
+    const [lx, ly] = line.points.at(-1);
+    svg.append(h("svg:circle", { class: `${line.cls} dot-end`, cx: sx(lx).toFixed(1), cy: sy(ly).toFixed(1), r: 4 }));
+  }
+  svg.append(h("svg:text", { class: "tick", x: L, y: H - 6, text: startLabel }));
+  svg.append(h("svg:text", { class: "tick strong", x: W - R, y: H - 6, "text-anchor": "end", text: endLabel }));
+  if (note) svg.append(h("svg:text", { class: "tick", x: L + 4, y: T + 10, text: note }));
+  return svg;
 }
 
 // ---------- plan grid ----------

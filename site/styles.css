@@ -583,6 +583,69 @@ tr.is-current .wk-num { color: var(--accent); }
 .glyph.ok { color: var(--ok); }
 .glyph.bad { color: var(--danger); }
 
+/* ---------- fitness: VO2 max and race predictor ---------- */
+.lvl-poor { --c: var(--danger); }
+.lvl-fair { --c: var(--warn); }
+.lvl-good { --c: var(--easy); }
+.lvl-excellent { --c: var(--long); }
+.lvl-superior { --c: var(--race); }
+.tabs { border: 0; margin: 0 0 16px; min-width: 0; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.tabs label { min-height: 36px; font-size: 0.85rem; }
+.fit-history .tabs { margin: 0 0 10px; }
+.vo2-big { display: flex; align-items: center; gap: 14px; margin: 4px 0 6px; }
+.vo2-num { font-size: 3.6rem; font-weight: 800; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.vo2-side { display: grid; gap: 2px; }
+.vo2-unit { color: var(--muted); font-size: 0.85rem; }
+.vo2-change { font-size: 0.85rem; font-weight: 700; color: var(--muted); }
+.vo2-change.up { color: var(--ok); }
+.vo2-change.down { color: var(--danger); }
+.vo2-level { margin: 0 0 10px; color: var(--muted); }
+.vo2-level strong { color: var(--c); font-size: 1.05rem; }
+.gauge { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; height: 12px; }
+.gauge-seg { border-radius: 6px; background: var(--c); opacity: 0.8; }
+.gauge-marker {
+  position: absolute;
+  top: 50%;
+  left: var(--pos, 0%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--fg);
+  transform: translate(-50%, -50%);
+  box-shadow: var(--shadow);
+}
+.gauge-labels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 8px 0 12px; font-size: 0.7rem; color: var(--muted); text-align: center; }
+.chart { display: block; width: 100%; height: auto; overflow: visible; }
+.chart .grid { stroke: var(--border); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.chart .tick.strong { fill: var(--fg); font-weight: 700; }
+.chart .band { fill: var(--c); opacity: 0.1; }
+.chart .band-text { fill: var(--muted); font-size: 9px; }
+.chart .line { fill: none; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.chart .line-vo2, .chart .line-real { stroke: var(--accent); }
+.chart .line-alt { stroke: var(--race); stroke-dasharray: 6 5; stroke-width: 2.5; }
+.chart .dot-end { stroke: var(--surface); stroke-width: 2; stroke-dasharray: none; }
+.chart .line-vo2.dot-end, .chart .line-real.dot-end { fill: var(--accent); }
+.chart .line-alt.dot-end { fill: var(--race); }
+.fit-summary { margin: 8px 0 0; color: var(--muted); font-size: 0.85rem; }
+.fit-summary strong { color: var(--fg); }
+.fit-changes { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; font-size: 0.85rem; }
+.fit-changes li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+.fit-change-text { color: var(--muted); font-variant-numeric: tabular-nums; }
+.fit-changes .faster { color: var(--ok); }
+.fit-changes .slower { color: var(--danger); }
+.key { width: 18px; height: 0; border-top: 3px solid var(--accent); }
+.key-alt { border-top: 3px dashed var(--race); }
+.race-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.race-table th, .race-table td { padding: 10px 6px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.race-table thead th { padding-top: 0; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.race-table tbody th { font-weight: 700; }
+.race-time { display: block; font-size: 1.15rem; font-weight: 800; }
+.race-alt .race-time { color: var(--muted); font-weight: 600; }
+.race-pace { display: block; font-size: 0.78rem; color: var(--muted); }
+.fit-note { margin: 12px 0 0; }
+
 /* ---------- details sheet and settings ---------- */
 dialog { border: 0; padding: 0; color: var(--fg); background: var(--surface); }
 dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
@@ -695,7 +758,7 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 @media (min-width: 1024px) {
   .layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "today week" "plan plan";
+    grid-template-areas: "today week" "vo2 race" "plan plan";
     align-items: start;
     gap: 24px;
     padding: 24px 24px 48px;
@@ -703,6 +766,8 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
   .today { grid-area: today; }
   .week { grid-area: week; }
   .plan { grid-area: plan; }
+  .vo2 { grid-area: vo2; }
+  .race { grid-area: race; }
   .fab { display: none; }
   .sheet {
     inset: 0 0 0 auto;
@@ -737,5 +802,5 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 @media (forced-colors: active) {
   .cell, .week-row, .chip, .preview, .status-btn { border: 1px solid CanvasText; }
   .cell.is-today, .week-row.is-today { outline: 3px solid Highlight; outline-offset: 1px; }
-  .bar rect, .type-bar, .step-dot, .swatch, .meter span, .mini-meter span, .progress span { forced-color-adjust: none; }
+  .bar rect, .type-bar, .step-dot, .swatch, .meter span, .mini-meter span, .progress span, .gauge-seg, .chart .line, .key { forced-color-adjust: none; }
 }

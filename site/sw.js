@@ -1,6 +1,6 @@
 // Offline copy of the app files. Never touches intervals.icu requests.
 // Cache-first, refreshed in the background so a new deploy shows on the next visit.
-const CACHE = "tc-shell-v1";
+const CACHE = "tc-shell-v2";
 const FILES = [
   "./",
   "index.html",
@@ -10,6 +10,7 @@ const FILES = [
   "src/api.js",
   "src/config.js",
   "src/dates.js",
+  "src/fitness.js",
   "src/model.js",
   "src/workout.js",
   "icons/icon.svg",
@@ -19,7 +20,9 @@ const FILES = [
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: "reload" skips the browser's HTTP cache, so one install never mixes old and new module files.
+  const fresh = FILES.map(f => new Request(f, { cache: "reload" }));
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(fresh)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", event => {
