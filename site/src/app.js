@@ -1,9 +1,11 @@
 // The page: rendering and interaction. All data logic lives in the pure modules.
 import { PLAN } from "./config.js";
 import { KeyError, NetworkError, connect, createStore, refresh } from "./api.js";
-import { WEEKDAYS, addDays, clampWeek, formatDate, formatDuration, formatKm, localToday, timeAgo, weekNumber } from "./dates.js";
+import {
+  WEEKDAYS, addDays, clampWeek, formatDate, formatDuration, formatKm, formatShortRange, localToday, timeAgo, weekNumber,
+} from "./dates.js";
 import { GROUP, TYPE_LABEL, formatStepAmount, noteText, paceRange, shortName, stepLevel, stepName, workoutBar } from "./workout.js";
-import { buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, runSummary, statusInfo } from "./model.js";
+import { buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, resultText, runSummary, statusInfo } from "./model.js";
 
 let storage = null;
 try {
@@ -30,6 +32,7 @@ const state = {
   detailsDate: null,
   opener: null,
   session: 0, // bumped on Forget / new key so late refresh results are dropped
+  openWeeks: null, // week numbers expanded in the phone plan list
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -96,6 +99,7 @@ function rebuild() {
   state.today = localToday();
   state.model = buildModel(state.data, state.today, PLAN);
   if (state.viewWeek == null) state.viewWeek = currentWeek();
+  if (!state.openWeeks) state.openWeeks = new Set([currentWeek()]);
   if (!state.focusDate || !state.model.byDate.has(state.focusDate)) {
     state.focusDate = state.model.byDate.has(state.today) ? state.today : state.model.days[0].date;
   }
@@ -303,7 +307,7 @@ function renderRun(a, label) {
 function renderWeek() {
   const wk = state.model.weeks[state.viewWeek - 1];
   const isCurrent = state.viewWeek === currentWeek();
-  const list = h("ul", { class: "week-list" }, wk.days.map(d => h("li", {}, weekRow(d))));
+  const list = h("ul", { class: "week-list" }, wk.days.map(d => h("li", {}, weekRow(d, "week"))));
   bindSwipe(list, dir => changeWeek(dir));
   return h("section", { class: "card week", "aria-labelledby": "week-title" },
     h("div", { class: "section-head" },
@@ -332,18 +336,27 @@ function kmMeter(doneM, plannedM) {
     h("div", { class: "meter", "aria-hidden": "true" }, h("span", { style: { "--p": pct(doneM, plannedM) } })));
 }
 
-function weekRow(d) {
-  const st = statusInfo(d, state.today);
+function dayName(d) {
   const w = primaryWorkout(d);
-  const group = w ? GROUP[w.type] : d.notes.length ? "rest" : "empty";
-  const name = w
-    ? shortName(w.name) + (d.workouts.length > 1 ? ` +${d.workouts.length - 1}` : "")
-    : d.notes.length ? "Rest" : "Nothing planned";
-  const km = d.workouts.reduce((t, x) => t + (x.distance || 0), 0);
+  if (w) return shortName(w.name) + (d.workouts.length > 1 ? ` +${d.workouts.length - 1}` : "");
+  return d.notes.length ? "Rest" : "Nothing planned";
+}
+
+const dayGroup = d => {
+  const w = primaryWorkout(d);
+  return w ? GROUP[w.type] : d.notes.length ? "rest" : "empty";
+};
+
+const plannedKm = d => d.workouts.reduce((t, x) => t + (x.distance || 0), 0);
+
+function weekRow(d, keyPrefix) {
+  const st = statusInfo(d, state.today);
+  const result = resultText(d, state.today);
+  const km = plannedKm(d);
   return h("button", {
     type: "button",
-    class: `week-row g-${group} s-${st.key}${d.isToday ? " is-today" : ""}`,
-    "data-key": `week:${d.date}`,
+    class: `week-row g-${dayGroup(d)} s-${st.key}${d.isToday ? " is-today" : ""}`,
+    "data-key": `${keyPrefix}:${d.date}`,
     "aria-current": d.isToday ? "date" : null,
     "aria-label": dayLabel(d, state.today),
     onclick: e => openDetails(d.date, e.currentTarget),
@@ -352,9 +365,10 @@ function weekRow(d) {
     h("span", { class: "wr-date", "aria-hidden": "true" },
       h("span", { class: "wr-wd", text: WEEKDAYS[d.weekday] }),
       h("span", { class: "wr-d", text: String(Number(d.date.slice(8))) })),
-    h("span", { class: "wr-name", text: name }),
-    h("span", { class: "wr-km", text: km ? `${formatKm(km)} km` : "" }),
-    st.short ? h("span", { class: `chip s-${st.key}` }, st.icon ? h("span", { "aria-hidden": "true", text: st.icon }) : "", st.short) : "");
+    h("span", { class: "wr-main", "aria-hidden": "true" },
+      h("span", { class: "wr-name", text: dayName(d) }),
+      result.text ? h("span", { class: `wr-result r-${result.kind}`, text: result.text }) : ""),
+    h("span", { class: "wr-km", "aria-hidden": "true", text: km ? `${formatKm(km)} km` : "" }));
 }
 
 function setWeek(n) {
@@ -419,15 +433,56 @@ function renderPlan() {
         }))),
     h("p", { id: "plan-help", class: "sr-only", text: "Arrow keys move between days. Enter opens the day." }),
     h("div", { class: "grid-wrap" }, table),
+    h("ul", { class: "plan-weeks", "aria-label": "Weeks" }, m.weeks.map(wk => h("li", {}, planWeekCard(wk, cur)))),
     renderLegend());
+}
+
+// Phone: one card per week; the header shows the week at a glance, the body lists its days.
+function planWeekCard(wk, cur) {
+  const open = state.openWeeks.has(wk.number);
+  const bodyId = `pw-body-${wk.number}`;
+  const dots = wk.days.map(d => {
+    const st = statusInfo(d, state.today);
+    const glyph = st.key === "done" ? "✓" : st.key === "missed" ? "!" : st.key === "partial" ? "◐" : WEEKDAYS[d.weekday].slice(0, 1);
+    return h("span", { class: `dot g-${dayGroup(d)} s-${st.key}${d.isToday ? " is-today" : ""}`, text: glyph });
+  });
+  const head = h("button", {
+    type: "button",
+    class: "pw-head",
+    "aria-expanded": String(open),
+    "aria-controls": bodyId,
+    "data-key": `pw:${wk.number}`,
+    onclick: e => togglePlanWeek(wk.number, e.currentTarget),
+  },
+    h("span", { class: "pw-title" },
+      h("strong", { text: `W${wk.number} · ${wk.phase}` }),
+      h("span", { class: "pw-dates", text: formatShortRange(wk.start, wk.end) })),
+    h("span", { class: "pw-km" },
+      h("span", { class: "sr-only", text: `, ${formatKm(wk.doneM)} of ${formatKm(wk.plannedM)} km` }),
+      h("span", { "aria-hidden": "true", text: `${formatKm(wk.doneM)} / ${formatKm(wk.plannedM)} km` }),
+      h("span", { class: "mini-meter", "aria-hidden": "true" }, h("span", { style: { "--p": pct(wk.doneM, wk.plannedM) } }))),
+    h("span", { class: "pw-chevron", "aria-hidden": "true" }, icon("right")),
+    h("span", { class: "pw-dots", "aria-hidden": "true" }, dots));
+  return h("div", { class: `pw${wk.number === cur ? " is-current" : ""}` },
+    h("h3", {}, head),
+    h("ul", { class: "week-list", id: bodyId, hidden: !open }, wk.days.map(d => h("li", {}, weekRow(d, "plan")))));
+}
+
+function togglePlanWeek(n, btn) {
+  const open = !state.openWeeks.has(n);
+  if (open) state.openWeeks.add(n);
+  else state.openWeeks.delete(n);
+  btn.setAttribute("aria-expanded", String(open));
+  document.getElementById(`pw-body-${n}`).hidden = !open;
 }
 
 function gridCell(d) {
   const st = statusInfo(d, state.today);
   const w = primaryWorkout(d);
-  const group = w ? GROUP[w.type] : d.notes.length ? "rest" : "empty";
   const mark = w ? MARKS[w.type] ?? "" : "";
-  const cls = ["cell", `g-${group}`, `s-${st.key}`, d.isToday && "is-today", d.date < state.today && "is-past"].filter(Boolean).join(" ");
+  const result = resultText(d, state.today);
+  const km = plannedKm(d);
+  const cls = ["cell", `g-${dayGroup(d)}`, `s-${st.key}`, d.isToday && "is-today", d.date < state.today && "is-past"].filter(Boolean).join(" ");
   return h("button", {
     type: "button",
     class: cls,
@@ -441,9 +496,12 @@ function gridCell(d) {
       openDetails(d.date, e.currentTarget);
     },
   },
-    h("span", { class: "cell-day", "aria-hidden": "true", text: String(Number(d.date.slice(8))) }),
-    st.icon ? h("span", { class: "cell-icon", "aria-hidden": "true", text: st.icon }) : "",
-    mark ? h("span", { class: "cell-mark", "aria-hidden": "true", text: mark }) : "");
+    h("span", { class: "cell-top", "aria-hidden": "true" },
+      h("span", { class: "cell-day", text: String(Number(d.date.slice(8))) }),
+      mark ? h("span", { class: "cell-mark", text: mark }) : ""),
+    d.workouts.length || d.notes.length ? h("span", { class: "cell-name", "aria-hidden": "true", text: dayName(d) }) : "",
+    km ? h("span", { class: "cell-km", "aria-hidden": "true", text: `${formatKm(km)} km` }) : "",
+    result.text ? h("span", { class: `cell-result r-${result.kind}`, "aria-hidden": "true", text: result.text }) : "");
 }
 
 function onGridKey(e) {
@@ -546,7 +604,8 @@ function stepDetails(dir) {
   if (!state.model.byDate.has(next)) return;
   state.detailsDate = next;
   moveGridFocus(next, false);
-  state.opener = byKey(`cell:${next}`) ?? state.opener;
+  // Return focus to whichever view of that day is on screen (grid cell on PC, plan row on phone).
+  state.opener = [`cell:${next}`, `plan:${next}`, `week:${next}`].map(byKey).find(el => el?.getClientRects().length) ?? state.opener;
   fillDetails(next);
   details.querySelector("#details-body").scrollTop = 0;
   announce(formatDate(next));

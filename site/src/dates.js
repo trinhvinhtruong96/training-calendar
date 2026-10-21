@@ -60,6 +60,14 @@ export function formatDate(iso) {
   return `${WEEKDAYS[weekdayIndex(iso)]} ${d} ${MONTHS[m - 1]}`;
 }
 
+// "2–8 Nov", or "30 Nov – 6 Dec" when the range crosses a month.
+export function formatShortRange(from, to) {
+  const [, m1, d1] = from.split("-").map(Number);
+  const [, m2, d2] = to.split("-").map(Number);
+  if (m1 === m2) return `${d1}–${d2} ${MONTHS[m2 - 1]}`;
+  return `${d1} ${MONTHS[m1 - 1]} – ${d2} ${MONTHS[m2 - 1]}`;
+}
+
 export function formatKm(metres, digits = 1) {
   return String(Number((metres / 1000).toFixed(digits)));
 }

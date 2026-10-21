@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  activityUrl, buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, runSummary, statusInfo,
+  activityUrl, buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, resultText, runSummary, statusInfo,
 } from "../site/src/model.js";
 import { activities, events } from "./fixtures.js";
 
@@ -84,9 +84,9 @@ test("accessible day labels", () => {
   const today = "2026-10-23";
   const m = buildModel(data, today);
   const label = d => dayLabel(m.byDate.get(d), today);
-  assert.equal(label("2026-10-21"), "Wed 21 Oct, 10×400 @4:05, 5.6 km, done");
+  assert.equal(label("2026-10-21"), "Wed 21 Oct, 10×400 @4:05, 5.6 km, done, 5.62 km at 7:09 per km");
   assert.equal(label("2026-10-23"), "Fri 23 Oct, today, Threshold 2×3 km, 8 km, not done yet");
-  assert.equal(label("2026-10-20"), "Tue 20 Oct, rest day, extra run");
+  assert.equal(label("2026-10-20"), "Tue 20 Oct, rest day, extra run, 3 km");
   assert.equal(label("2026-10-24"), "Sat 24 Oct, nothing planned");
 });
 
@@ -138,6 +138,32 @@ test("primary workout: test, key or race first, then a run, else the first entry
   assert.equal(primaryWorkout(m.byDate.get("2026-10-20")), null);
   const gymOnly = { date: "2026-10-24", workouts: [{ id: 9, type: "run", sport: "WeightTraining" }] };
   assert.equal(primaryWorkout(gymOnly).id, 9);
+});
+
+test("result line for each kind of day", () => {
+  const today = "2026-10-23";
+  const m = buildModel(data, today);
+  const r = d => resultText(m.byDate.get(d), today);
+  assert.deepEqual(r("2026-10-21"), { kind: "done", text: "✓ 5.62 km · 7:09/km", spoken: "5.62 km at 7:09 per km" });
+  assert.deepEqual(r("2026-10-20"), { kind: "extra", text: "+ 3 km run", spoken: "3 km" });
+  assert.deepEqual(r("2026-10-23"), { kind: "today", text: "Today", spoken: "" });
+  assert.deepEqual(r("2026-10-25"), { kind: "planned", text: "", spoken: "" });
+  assert.deepEqual(r("2026-10-24"), { kind: "empty", text: "", spoken: "" });
+  const later = buildModel(data, "2026-10-26");
+  assert.deepEqual(resultText(later.byDate.get("2026-10-23"), "2026-10-26"), { kind: "missed", text: "! Missed", spoken: "" });
+});
+
+test("result line for a partly done day, a plain rest day and a run without numbers", () => {
+  const second = { ...events[2], id: 99, name: "Strides 2 km", distance: 2000 };
+  const partial = buildModel({ events: [...events, second], activities }, "2026-10-23");
+  assert.deepEqual(resultText(partial.byDate.get("2026-10-22"), "2026-10-23"), { kind: "partial", text: "◐ 1 of 2 done", spoken: "1 of 2 workouts done" });
+
+  const rest = buildModel({ events, activities: activities.filter(a => a.id !== "i10") }, "2026-10-23");
+  assert.deepEqual(resultText(rest.byDate.get("2026-10-20"), "2026-10-23"), { kind: "rest", text: "", spoken: "" });
+
+  const blank = { id: "i40", date: "2026-10-25", type: "Run", name: "Run", distance: 0, movingTime: 0, avgHr: null, pairedEventId: null, compliance: null };
+  const manual = buildModel({ events, activities: [...activities, blank] }, "2026-10-26");
+  assert.deepEqual(resultText(manual.byDate.get("2026-10-25"), "2026-10-26"), { kind: "done", text: "✓ Done", spoken: "" });
 });
 
 test("links to intervals.icu", () => {

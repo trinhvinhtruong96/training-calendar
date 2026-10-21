@@ -136,6 +136,39 @@ export function statusInfo(day, today) {
   }
 }
 
+// One short result line per day for the plan, plus the words a screen reader should add.
+export function resultText(day, today) {
+  const none = kind => ({ kind, text: "", spoken: "" });
+  switch (day.status) {
+    case "done": {
+      const run = primaryWorkout(day)?.run ?? day.workouts.find(w => w.run)?.run;
+      const km = run?.distance > 0 ? formatKm(run.distance, 2) : "";
+      const pace = km && run.movingTime > 0 ? formatPace(run.movingTime / (run.distance / 1000)) : "";
+      if (!km) return { kind: "done", text: "✓ Done", spoken: "" };
+      return {
+        kind: "done",
+        text: pace ? `✓ ${km} km · ${pace}/km` : `✓ ${km} km`,
+        spoken: pace ? `${km} km at ${pace} per km` : `${km} km`,
+      };
+    }
+    case "partial": {
+      const done = day.workouts.filter(w => w.run).length;
+      return { kind: "partial", text: `◐ ${done} of ${day.workouts.length} done`, spoken: `${done} of ${day.workouts.length} workouts done` };
+    }
+    case "missed":
+      return { kind: "missed", text: "! Missed", spoken: "" };
+    case "planned":
+      return day.date === today ? { kind: "today", text: "Today", spoken: "" } : none("planned");
+    case "rest": {
+      if (!day.extraRuns.length) return none("rest");
+      const km = formatKm(day.extraRuns.reduce((t, a) => t + (a.distance || 0), 0));
+      return { kind: "extra", text: `+ ${km} km run`, spoken: `${km} km` };
+    }
+    default:
+      return none("empty");
+  }
+}
+
 export function dayLabel(day, today) {
   const parts = [formatDate(day.date)];
   if (day.date === today) parts.push("today");
@@ -143,6 +176,8 @@ export function dayLabel(day, today) {
     parts.push(w.distance ? `${shortName(w.name)}, ${formatKm(w.distance)} km` : shortName(w.name));
   }
   parts.push(statusInfo(day, today).label);
+  const { spoken } = resultText(day, today);
+  if (spoken) parts.push(spoken);
   return parts.join(", ");
 }
 

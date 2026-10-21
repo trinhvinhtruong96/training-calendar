@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   addDays, clampWeek, dayNumber, daysToRace, diffDays, formatClock, formatDate, formatDuration, formatKm, formatPace,
-  localToday, mondayOf, timeAgo, totalDays, weekNumber, weekdayIndex,
+  formatShortRange, localToday, mondayOf, timeAgo, totalDays, weekNumber, weekdayIndex,
 } from "../site/src/dates.js";
 
 test("addDays and diffDays cross months and years", () => {
@@ -49,6 +49,12 @@ test("formats dates, distances, paces and times", () => {
   assert.equal(formatDuration(5400), "1 h 30 min");
   assert.equal(formatClock(2412), "40:12");
   assert.equal(formatClock(5731), "1:35:31");
+});
+
+test("short week ranges", () => {
+  assert.equal(formatShortRange("2026-11-02", "2026-11-08"), "2–8 Nov");
+  assert.equal(formatShortRange("2026-11-30", "2026-12-06"), "30 Nov – 6 Dec");
+  assert.equal(formatShortRange("2026-12-28", "2027-01-03"), "28 Dec – 3 Jan");
 });
 
 test("timeAgo describes when data was fetched", () => {
