@@ -60,11 +60,14 @@ site/                      published to GitHub Pages
   sw.js                    offline cache of the app files (never caches API data)
   icons/                   icon.svg, icon-192.png, icon-512.png, apple-touch-icon.png
   src/config.js            plan constants (§5)
-  src/plan.js              pure: dates, weeks, day status, run matching, km, workout type, workout bar
+  src/dates.js             pure: date math (weeks, days, countdown) and formatting
+  src/workout.js           pure: workout type, names, notes, steps, pace ranges, workout bar
+  src/model.js             pure: days and weeks, run matching, day status, km, labels, header text
   src/api.js               pure-ish: intervals.icu fetch + cache, with injected fetch and storage
   src/app.js               DOM rendering and interaction (the only module that touches the DOM)
+tools/serve.js             dev-only static server for site/ on http://localhost:8080
 test/
-  plan.test.js, api.test.js, fixtures.js (synthetic data only)
+  dates.test.js, workout.test.js, model.test.js, api.test.js, fixtures.js (synthetic data only)
 .github/workflows/pages.yml  test, then deploy site/ on push to main
 package.json               "type": "module", scripts: test, serve
 README.md                  what it is, one-time GitHub setup, connecting the key, local dev, privacy
@@ -77,7 +80,7 @@ README.md                  what it is, one-time GitHub setup, connecting the key
 - Phase names by week: 1 Start · 2–4 Adapt · 5 Light · 6–8 Build · 9 Peak · 10 Light ·
   11 Race-specific · 12 Key week · 13 Race-specific · 14 Taper · 15 Race.
 
-## 6. Data model (`src/plan.js`)
+## 6. Data model (`src/dates.js`, `src/workout.js`, `src/model.js`)
 
 **Today** is the device's local date (`YYYY-MM-DD`). Dates compare as date strings taken from the first
 10 characters of `start_date_local`; no time-zone conversion.
@@ -161,9 +164,10 @@ the reason (§8). A note says the key is saved only in this browser and the page
 5. **Details** (tap any day): bottom sheet on narrow screens, side panel on wide screens: all events of
    the day with full steps, notes, actual run(s) and links to intervals.icu. Other activities that day
    (e.g. weight training) are listed as "Also".
-6. **Today button** (floating on phone, in header on PC) and key `T` jump to today.
-7. **Settings dialog:** connected athlete name; theme (System / Light / Dark); Refresh; Forget key
-   (removes key and cached data from this browser).
+6. **Today button** (floating on phone, in header on PC) and key `T` jump to today. The `T` shortcut
+   can be switched off in settings (WCAG 2.1.4, single-key shortcuts).
+7. **Settings dialog:** connected athlete name; theme (System / Light / Dark); `T` shortcut on/off;
+   Refresh; Forget key (removes key and cached data from this browser).
 
 **Layout:** < 720 px one column; ≥ 1024 px two columns (Today + This week left, Plan right);
 720–1023 px one column with the wide plan table.
@@ -190,10 +194,13 @@ the reason (§8). A note says the key is saved only in this browser and the page
 | Page hidden > 5 min, then shown again | refresh automatically |
 
 **Cache:** `localStorage` key `tc.v1.data` holds `{fetchedAt, athleteName, events, activities}`, reduced to
-the fields in §2. The key is in `tc.v1.key`. Theme in `tc.v1.theme`.
+the fields in §2. The key is in `tc.v1.key`, the theme in `tc.v1.theme`, the `T` shortcut setting in
+`tc.v1.shortcut`. If `localStorage` is unavailable or full (private mode, quota), values are kept in memory
+for the session and the page keeps working without a saved copy.
 
 **Service worker:** caches the files under `site/` (cache name includes a version) and serves them
-cache-first, falling back to the network; it never stores intervals.icu responses.
+cache-first, falling back to the network, and refreshes the cached copy in the background so a new
+deploy shows on the next visit; it never stores intervals.icu responses.
 
 ## 9. Security
 
@@ -204,9 +211,9 @@ cache-first, falling back to the network; it never stores intervals.icu response
 
 ## 10. Testing
 
-- `npm test` → `node --test`. `plan.test.js` covers: week number and day number; days to race;
-  workout type rules; run matching (pairing first, then same date, no double use); every status in §6;
-  week and plan km totals; workout bar flattening, widths and levels. `api.test.js` (fake fetch and
+- `npm test` → `node --test`. `dates.test.js`, `workout.test.js` and `model.test.js` cover: week number and
+  day number; days to race; workout type rules; run matching (pairing first, then same date, no double use);
+  every status in §6; week and plan km totals; workout bar flattening, widths and levels. `api.test.js` (fake fetch and
   storage) covers: auth header and URLs; cache saved and served; 401/403 → key error; network error →
   offline with cache; field reduction.
 - Fixtures are synthetic; no real activity data in the repo.
