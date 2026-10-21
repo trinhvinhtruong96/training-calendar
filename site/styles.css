@@ -497,7 +497,7 @@ tr.is-current .wk-num { color: var(--accent); }
 .cell-day { font-weight: 700; font-variant-numeric: tabular-nums; }
 .cell-icon { position: absolute; top: 1px; right: 4px; font-size: 0.66rem; font-weight: 800; }
 .cell.s-missed .cell-icon { color: var(--danger); }
-.cell-mark { position: absolute; bottom: 1px; left: 4px; font-size: 0.58rem; font-weight: 800; }
+.cell-mark { position: absolute; top: 1px; left: 4px; font-size: 0.58rem; font-weight: 800; }
 .legend {
   list-style: none;
   display: flex;
@@ -620,6 +620,9 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
   .plan-grid .km-col { width: 48px; }
   .week-row { gap: 10px; padding: 10px 8px; }
 }
+@media (min-width: 720px) {
+  .cell { aspect-ratio: auto; height: 38px; }
+}
 @media (max-width: 1023px) {
   .today-btn { display: none; }
 }
@@ -627,6 +630,7 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
   .layout {
     grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
     grid-template-areas: "today plan" "week plan";
+    grid-template-rows: auto 1fr;
     align-items: start;
     gap: 24px;
     padding: 24px 24px 48px;
