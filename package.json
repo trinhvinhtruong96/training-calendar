@@ -2,7 +2,7 @@
   "name": "training-calendar",
   "private": true,
   "type": "module",
-  "description": "HM sub-1:30 training calendar, live from intervals.icu",
+  "description": "HM sub-2:00 training calendar, live from intervals.icu",
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
     "serve": "node tools/serve.js"

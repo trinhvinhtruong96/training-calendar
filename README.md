@@ -1,6 +1,6 @@
-# HM sub-1:30 training calendar
+# HM sub-2:00 training calendar
 
-A small web page for the HM sub-1:30 plan (20 Oct 2026 → race on Sun 31 Jan 2027). It shows today's
+A small web page for the HM sub-2:00 plan (20 Oct 2026 → race on Sun 31 Jan 2027). It shows today's
 workout, this week, all 15 weeks with today highlighted, and your completed runs next to each planned
 workout. Everything is read live from [intervals.icu](https://intervals.icu) in your browser.
 
