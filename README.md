@@ -9,8 +9,11 @@ Live site: <https://trinhvinhtruong96.github.io/training-calendar/>
 ## Use it
 
 1. Open the live site on your phone or PC.
-2. Paste your intervals.icu API key (intervals.icu → Settings → Developer Settings → API Key) and press
-   **Connect**. The key is saved only in that browser, so do this once per device.
+2. Press **Log in with intervals.icu** and allow access on intervals.icu (only read access to planned
+   workouts and runs is asked for). Or open **Use an API key instead**, paste your intervals.icu API key
+   (intervals.icu → Settings → Developer Settings → API Key) and press **Connect**. The login or key is
+   saved only in that browser, so do this once per device. The login button shows once `OAUTH.clientId`
+   is set (see below); until then the page offers the key only.
 3. Optional: add it to your home screen (iPhone Safari: Share → Add to Home Screen; Android Chrome:
    ⋮ → Add to Home screen).
 
@@ -25,18 +28,28 @@ intervals.icu (for example new paces after a test) show up the next time the pag
 2. Settings → Pages → Build and deployment → Source: **GitHub Actions**.
 3. Push to `main`. `.github/workflows/pages.yml` runs the tests and publishes the `site/` folder.
 
+## One-time intervals.icu login setup
+
+1. While logged in to intervals.icu, register an app at <https://intervals.icu/oauth/apply>.
+2. On its management page (intervals.icu → Settings → Apps → Manage App), tick **public client** and add
+   these redirect URIs exactly: `https://trinhvinhtruong96.github.io/training-calendar/` and
+   `http://localhost:8080/`.
+3. Put the app's client ID (not the secret) in `OAUTH.clientId` in `site/src/config.js` and push. The client ID
+   is not secret. Logins work only after intervals.icu has approved the app (its "Pending" tag is gone).
+
 ## Privacy and security
 
-- No API key, plan or run data is stored in this repository. Someone who opens the link without a key
-  only sees the setup screen.
-- The key and the last loaded data live in your browser's local storage. Settings → **Forget key on
-  this device** removes them. To revoke the key everywhere, clear it in intervals.icu → Settings →
-  Developer Settings.
-- The page only reads from intervals.icu and only talks to `https://intervals.icu` (enforced by its
-  Content Security Policy). The key itself, though, gives full access to your intervals.icu account.
+- No API key, login, plan or run data is stored in this repository. Someone who opens the link without
+  connecting only sees the setup screen.
+- The login (or key) and the last loaded data live in your browser's local storage. Settings → **Log out
+  on this device** (or **Forget key on this device**) removes them; logging out also ends the login on
+  intervals.icu. You can end a login there too (Settings → Apps), or revoke a key under Developer Settings.
+- The login uses OAuth with PKCE and no client secret, and grants read access to planned workouts and
+  runs only. The page only reads from intervals.icu and only talks to `https://intervals.icu` (enforced by
+  its Content Security Policy). An API key, though, gives full access to your intervals.icu account.
 - All GitHub Pages sites of one account share the origin `https://trinhvinhtruong96.github.io`, and
   with it the browser's local storage. Any other Pages site you publish under this account (and any
-  third-party script it loads) could read the saved key. Keep other Pages sites free of third-party
+  third-party script it loads) could read the saved login or key. Keep other Pages sites free of third-party
   scripts, or host this page on its own domain.
 
 ## Develop
@@ -54,6 +67,7 @@ npm run serve   # http://localhost:8080
 | `site/src/config.js` | Plan dates, title and phase names |
 | `site/src/dates.js`, `workout.js`, `model.js` | Pure logic: dates, workouts, days/weeks/statuses |
 | `site/src/api.js` | Read-only intervals.icu client and browser storage |
+| `site/src/auth.js` | "Log in with intervals.icu" (OAuth with PKCE, no secret) |
 | `site/src/app.js` | Rendering and interaction |
 | `site/sw.js`, `site/manifest.webmanifest`, `site/icons/` | Offline support and home-screen app |
 | `test/` | Unit tests with synthetic data |

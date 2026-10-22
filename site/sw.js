@@ -8,6 +8,7 @@ const FILES = [
   "manifest.webmanifest",
   "src/app.js",
   "src/api.js",
+  "src/auth.js",
   "src/config.js",
   "src/dates.js",
   "src/model.js",
@@ -36,12 +37,15 @@ self.addEventListener("fetch", event => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  // Fetched and cached without the query: with the worker in place, a login return (?code=…) is neither
+  // passed on to the host nor kept in the cache.
+  const key = url.search ? new Request(`${url.origin}${url.pathname}`) : request;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(request, { ignoreSearch: true });
-    const network = fetch(request)
+    const cached = await cache.match(key);
+    const network = fetch(key)
       .then(response => {
-        if (response.ok) cache.put(request, response.clone());
+        if (response.ok) cache.put(key, response.clone());
         return response;
       })
       .catch(() => null);

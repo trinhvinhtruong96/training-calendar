@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  HttpError, KeyError, NetworkError, authHeader, connect, createStore, reduceActivity, reduceEvent, refresh, request,
+  HttpError, KeyError, NetworkError, authHeader, connect, createStore, reduceActivity, reduceEvent, refresh, request, saveLogin,
 } from "../site/src/api.js";
 
 const BASE = "https://intervals.icu/api/v1";
+const KEY = { type: "key", secret: "secret-key" };
 
 function memoryStorage() {
   const map = new Map();
@@ -63,20 +64,21 @@ const rawActivity = {
   moving_time: 2412, average_heartrate: 152.4, paired_event_id: 2, compliance: 96.4, device_name: "Watch", calories: 400,
 };
 
-test("auth header uses API_KEY and the key", () => {
-  assert.equal(authHeader("abc123"), `Basic ${Buffer.from("API_KEY:abc123").toString("base64")}`);
+test("auth header is Basic API_KEY for a key and Bearer for a login", () => {
+  assert.equal(authHeader({ type: "key", secret: "abc123" }), `Basic ${Buffer.from("API_KEY:abc123").toString("base64")}`);
+  assert.equal(authHeader({ type: "oauth", secret: "tok-1" }), "Bearer tok-1");
 });
 
-test("request sends the key and returns JSON", async () => {
+test("request sends the credential and returns JSON", async () => {
   const f = fakeFetch({ "/athlete/0": reply(200, { name: "Runner" }) });
-  assert.deepEqual(await request("/athlete/0", "secret-key", f), { name: "Runner" });
+  assert.deepEqual(await request("/athlete/0", KEY, f), { name: "Runner" });
   assert.equal(f.calls[0].url, `${BASE}/athlete/0`);
-  assert.equal(f.calls[0].init.headers.Authorization, authHeader("secret-key"));
+  assert.equal(f.calls[0].init.headers.Authorization, authHeader(KEY));
   assert.equal(f.calls[0].init.headers.Accept, "application/json");
 });
 
 test("request turns failures into clear errors", async () => {
-  const run = route => request("/athlete/0", "k", fakeFetch({ "/athlete/0": route }));
+  const run = route => request("/athlete/0", KEY, fakeFetch({ "/athlete/0": route }));
   await assert.rejects(run(reply(401, { error: "Unauthorized" })), KeyError);
   await assert.rejects(run(reply(403, { error: "Access denied" })), KeyError);
   await assert.rejects(
@@ -111,7 +113,7 @@ test("events and activities are reduced to the fields the page uses", () => {
 
 test("refresh loads the plan range and caches a reduced copy", async () => {
   const store = createStore(memoryStorage());
-  store.setKey("secret-key");
+  store.setAuth(KEY);
   store.setCache({ fetchedAt: null, athleteName: "Runner", events: [], activities: [] });
   const f = fakeFetch({
     "/athlete/0/events": reply(200, [rawEvent]),
@@ -132,7 +134,7 @@ test("refresh loads the plan range and caches a reduced copy", async () => {
 
 test("refresh before the plan starts still asks for a valid activity range", async () => {
   const store = createStore(memoryStorage());
-  store.setKey("secret-key");
+  store.setAuth(KEY);
   const f = fakeFetch({ "/athlete/0/events": reply(200, []), "/athlete/0/activities": reply(200, []) });
   await refresh({ store, today: "2026-10-01", fetchImpl: f });
   assert.ok(f.calls.some(c => c.url.endsWith("/athlete/0/activities?oldest=2026-10-19&newest=2026-10-19")));
@@ -151,8 +153,8 @@ test("connect trims the key, checks it, and saves it with the athlete name", asy
   store.setCache({ fetchedAt: "x", athleteName: "Old", events: [{ id: 1 }], activities: [] });
   const f = fakeFetch({ "/athlete/0": reply(200, { name: "Truong" }) });
   assert.deepEqual(await connect("  secret-key-123\n", { store, fetchImpl: f }), { athleteName: "Truong" });
-  assert.equal(store.getKey(), "secret-key-123");
-  assert.equal(f.calls[0].init.headers.Authorization, authHeader("secret-key-123"));
+  assert.deepEqual(store.getAuth(), { type: "key", secret: "secret-key-123" });
+  assert.equal(f.calls[0].init.headers.Authorization, authHeader({ type: "key", secret: "secret-key-123" }));
   assert.deepEqual(store.getCache(), { fetchedAt: null, athleteName: "Truong", events: [], activities: [] });
 });
 
@@ -162,17 +164,17 @@ test("connect rejects a malformed or refused key and saves nothing", async () =>
   await assert.rejects(connect("not a key", { store, fetchImpl: none }), e => e instanceof KeyError && e.reason === "format");
   assert.equal(none.calls.length, 0);
   await assert.rejects(connect("secret-key-123", { store, fetchImpl: fakeFetch({ "/athlete/0": reply(401, {}) }) }), KeyError);
-  assert.equal(store.getKey(), null);
+  assert.equal(store.getAuth(), null);
 });
 
 test("store survives blocked storage and corrupt data", () => {
   const blocked = createStore(brokenStorage());
-  blocked.setKey("secret-key");
-  assert.equal(blocked.getKey(), "secret-key");
+  blocked.setAuth(KEY);
+  assert.deepEqual(blocked.getAuth(), KEY);
   blocked.setCache({ fetchedAt: null, athleteName: "", events: [], activities: [] });
   assert.deepEqual(blocked.getCache().events, []);
   assert.equal(blocked.getTheme(), "system");
-  assert.equal(createStore(null).getKey(), null);
+  assert.equal(createStore(null).getAuth(), null);
 
   const storage = memoryStorage();
   storage.setItem("tc.v1.data", "{not json");
@@ -181,25 +183,53 @@ test("store survives blocked storage and corrupt data", () => {
 
 test("refresh does not save data when the key is removed while it loads", async () => {
   const store = createStore(memoryStorage());
-  store.setKey("secret-key");
+  store.setAuth(KEY);
   const forgetMidway = async () => {
     store.forget();
     return reply(200, []);
   };
   await refresh({ store, today: "2026-10-21", fetchImpl: forgetMidway });
-  assert.equal(store.getKey(), null);
+  assert.equal(store.getAuth(), null);
   assert.equal(store.getCache(), null);
 });
 
-test("forget removes the key and the saved data but keeps settings", () => {
+test("forget removes the credential and the saved data but keeps settings", () => {
   const store = createStore(memoryStorage());
-  store.setKey("secret-key");
+  store.setAuth(KEY);
   store.setCache({ fetchedAt: null, athleteName: "", events: [], activities: [] });
   store.setTheme("dark");
   store.setShortcut(false);
   store.forget();
-  assert.equal(store.getKey(), null);
+  assert.equal(store.getAuth(), null);
   assert.equal(store.getCache(), null);
   assert.equal(store.getTheme(), "dark");
   assert.equal(store.getShortcut(), false);
+});
+
+test("a login replaces a saved key, refresh sends its Bearer token, and Forget removes it", async () => {
+  const storage = memoryStorage();
+  const store = createStore(storage);
+  store.setAuth(KEY);
+  store.setCache({ fetchedAt: "x", athleteName: "Old", events: [{ id: 1 }], activities: [] });
+  saveLogin("tok-1", "Truong", { store });
+  assert.deepEqual(store.getAuth(), { type: "oauth", secret: "tok-1" });
+  assert.equal(storage.map.has("tc.v1.key"), false);
+  assert.deepEqual(store.getCache(), { fetchedAt: null, athleteName: "Truong", events: [], activities: [] });
+
+  const f = fakeFetch({ "/athlete/0/events": reply(200, []), "/athlete/0/activities": reply(200, []) });
+  await refresh({ store, today: "2026-10-21", fetchImpl: f });
+  assert.ok(f.calls.every(c => c.init.headers.Authorization === "Bearer tok-1"));
+
+  store.setAuth(KEY);
+  assert.equal(storage.map.has("tc.v1.token"), false);
+  saveLogin("tok-2", "Truong", { store });
+  store.forget();
+  assert.equal(store.getAuth(), null);
+  assert.deepEqual([...storage.map.keys()].filter(k => k === "tc.v1.key" || k === "tc.v1.token"), []);
+});
+
+test("a key saved before logins existed still connects", () => {
+  const storage = memoryStorage();
+  storage.setItem("tc.v1.key", "old-key-123");
+  assert.deepEqual(createStore(storage).getAuth(), { type: "key", secret: "old-key-123" });
 });

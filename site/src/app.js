@@ -1,6 +1,7 @@
 // The page: rendering and interaction. All data logic lives in the pure modules.
-import { PLAN } from "./config.js";
-import { KeyError, NetworkError, connect, createStore, refresh } from "./api.js";
+import { OAUTH, PLAN } from "./config.js";
+import { KeyError, NetworkError, connect, createStore, refresh, saveLogin } from "./api.js";
+import { finishLogin, readCallback, redirectUri, revoke, startLogin } from "./auth.js";
 import {
   WEEKDAYS, addDays, clampWeek, formatDate, formatDuration, formatKm, formatShortRange, localToday, timeAgo, weekNumber,
 } from "./dates.js";
@@ -614,7 +615,14 @@ function stepDetails(dir) {
 // ---------- settings ----------
 function openSettings() {
   const name = state.data?.athleteName;
-  settings.querySelector("#settings-athlete").textContent = name ? `Connected to intervals.icu as ${name}.` : "Connected to intervals.icu.";
+  const viaLogin = store.getAuth()?.type === "oauth";
+  const who = name ? `Connected to intervals.icu as ${name}` : "Connected to intervals.icu";
+  settings.querySelector("#settings-athlete").textContent = `${who} ${viaLogin ? "with the intervals.icu login" : "with an API key"}.`;
+  settings.querySelector('[data-action="forget"]').textContent = viaLogin ? "Log out on this device" : "Forget key on this device";
+  const link = externalLink("https://intervals.icu/settings", "intervals.icu settings");
+  settings.querySelector("#settings-note").replaceChildren(...(viaLogin
+    ? ["The login is stored only in this browser. Logging out also ends it on intervals.icu. You can end it there too, in ", link, "."]
+    : ["The key is stored only in this browser. To revoke it everywhere, clear the API key in ", link, " under Developer Settings."]));
   const theme = store.getTheme();
   for (const r of settings.querySelectorAll('input[name="theme"]')) r.checked = r.value === theme;
   settings.querySelector('input[name="shortcut"]').checked = store.getShortcut();
@@ -630,13 +638,16 @@ function resetSession() {
   state.viewWeek = null;
 }
 
-function forgetKey() {
-  if (!window.confirm("Forget the API key and saved data on this device?")) return;
+function forgetCredential() {
+  const auth = store.getAuth();
+  const viaLogin = auth?.type === "oauth";
+  if (!window.confirm(viaLogin ? "Log out and forget saved data on this device?" : "Forget the API key and saved data on this device?")) return;
   store.forget();
   settings.close();
   resetSession();
-  renderSetup("");
-  announce("Key removed from this device");
+  renderSetup();
+  announce(viaLogin ? "Logged out on this device" : "Key removed from this device");
+  revoke(auth); // best effort, after this device is already cleared
 }
 
 function wireDialogs() {
@@ -672,7 +683,7 @@ function wireDialogs() {
     else if (action === "refresh") {
       settings.close();
       doRefresh({ announceResult: true });
-    } else if (action === "forget") forgetKey();
+    } else if (action === "forget") forgetCredential();
   });
   settings.addEventListener("change", e => {
     if (e.target.name === "theme") {
@@ -687,9 +698,19 @@ function wireDialogs() {
 }
 
 // ---------- setup, loading, errors ----------
-function renderSetup(message) {
+function sessionStore() {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+// about: "login" puts the message next to the login button, "key" next to the key field.
+function renderSetup(message = "", about = "key") {
   if (details.open) details.close();
   if (settings.open) settings.close();
+  const loginOn = Boolean(OAUTH.clientId);
   const input = h("input", {
     id: "key", name: "key", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false",
     "aria-describedby": "key-help",
@@ -702,8 +723,10 @@ function renderSetup(message) {
     toggle.setAttribute("aria-pressed", String(show));
     toggle.textContent = show ? "Hide" : "Show";
   });
-  const submit = h("button", { type: "submit", class: "btn primary block" }, "Connect");
+  const submit = h("button", { type: "submit", class: `btn ${loginOn ? "" : "primary "}block` }, "Connect");
+  let keyOption = null; // the "Use an API key instead" fold, when the login is offered
   const showError = text => {
+    if (keyOption) keyOption.open = true;
     error.textContent = text;
     input.setAttribute("aria-invalid", "true");
     input.setAttribute("aria-describedby", "key-help key-error");
@@ -739,19 +762,78 @@ function renderSetup(message) {
       }
     }
   });
+  const keySteps = h("ol", { class: "setup-steps" },
+    h("li", {}, "Open ", externalLink("https://intervals.icu/settings", "intervals.icu settings"), "."),
+    h("li", { text: "In Developer Settings, copy your API Key." }),
+    h("li", { text: "Paste it below and press Connect." }));
+
+  let login = [keySteps, form];
+  let showLoginError = showError;
+  let focusStart = () => input.focus();
+  if (loginOn) {
+    const loginError = h("p", { id: "login-error", class: "error", role: "alert" });
+    const label = "Log in with intervals.icu";
+    const loginBtn = h("button", { type: "button", class: "btn primary block", "aria-describedby": "login-help" }, label);
+    loginBtn.addEventListener("click", async () => {
+      loginBtn.disabled = true;
+      loginBtn.textContent = "Opening intervals.icu…";
+      loginError.textContent = "";
+      try {
+        window.location.assign(await startLogin({ session: sessionStore(), location: window.location }));
+      } catch (err) {
+        loginBtn.disabled = false;
+        loginBtn.textContent = label;
+        showLoginError(err.message);
+      }
+    });
+    keyOption = h("details", { class: "key-option" }, h("summary", { text: "Use an API key instead" }), keySteps, form);
+    login = [
+      h("div", { class: "setup-form" },
+        loginBtn,
+        h("p", { id: "login-help", class: "muted small", text: "Opens intervals.icu. The page asks only to read your planned workouts and runs." }),
+        loginError),
+      keyOption,
+    ];
+    showLoginError = text => {
+      loginError.textContent = text;
+      loginBtn.setAttribute("aria-describedby", "login-help login-error");
+      loginBtn.focus();
+    };
+    focusStart = () => loginBtn.focus();
+  }
   app.replaceChildren(h("main", { id: "main", class: "setup" },
     h("section", { class: "card setup-card", "aria-labelledby": "setup-title" },
       h("img", { class: "logo", src: "icons/icon.svg", alt: "", width: "56", height: "56" }),
       h("h1", { id: "setup-title", text: "Connect intervals.icu" }),
       h("p", { class: "lead", text: `See your ${PLAN.title} plan, today's workout and your runs, live from intervals.icu.` }),
-      h("ol", { class: "setup-steps" },
-        h("li", {}, "Open ", externalLink("https://intervals.icu/settings", "intervals.icu settings"), "."),
-        h("li", { text: "In Developer Settings, copy your API Key." }),
-        h("li", { text: "Paste it below and press Connect." })),
-      form)));
+      login)));
   app.removeAttribute("aria-busy");
-  if (message) showError(message);
-  else input.focus();
+  if (!message) focusStart();
+  else if (about === "login") showLoginError(message);
+  else showError(message);
+}
+
+// intervals.icu sent the browser back here after a login. Returns false when it failed but this device
+// is still connected (e.g. an old login link), so the calendar loads as usual.
+async function completeLogin(callback) {
+  window.history.replaceState(null, "", redirectUri(window.location)); // the one-time code leaves the address bar at once
+  renderLoading();
+  try {
+    const { token, athleteName } = await finishLogin(callback, { session: sessionStore() });
+    resetSession();
+    saveLogin(token, athleteName, { store });
+    state.data = store.getCache();
+    await doRefresh();
+    if (state.status.kind === "ok") announce("Logged in. Calendar loaded.");
+  } catch (err) {
+    const text = err instanceof NetworkError ? "Can't reach intervals.icu. Check your connection and log in again." : err.message;
+    if (store.getAuth()) {
+      announce(text);
+      return false;
+    }
+    renderSetup(text, "login");
+  }
+  return true;
 }
 
 function renderLoading() {
@@ -770,7 +852,8 @@ function renderError(message) {
       h("p", { class: "error", role: "alert", text: message }),
       h("div", { class: "row" },
         h("button", { type: "button", class: "btn primary", onclick: () => { renderLoading(); doRefresh(); } }, "Try again"),
-        h("button", { type: "button", class: "btn ghost", onclick: () => { store.forget(); resetSession(); renderSetup(""); } }, "Use a different key")))));
+        h("button", { type: "button", class: "btn ghost", onclick: () => { store.forget(); resetSession(); renderSetup(); } },
+          store.getAuth()?.type === "oauth" ? "Log in again" : "Use a different key")))));
 }
 
 // ---------- data ----------
@@ -790,9 +873,12 @@ async function doRefresh({ announceResult = false } = {}) {
   } catch (err) {
     if (session !== state.session) return;
     if (err instanceof KeyError) {
+      const viaLogin = store.getAuth()?.type === "oauth";
       state.status = { kind: "idle", message: "" };
       state.model = null;
-      renderSetup(err.reason === "missing" ? "" : "Your key was not accepted. Paste a current key from intervals.icu.");
+      if (err.reason === "missing") renderSetup();
+      else if (viaLogin) renderSetup("Your intervals.icu login has ended. Log in again.", "login");
+      else renderSetup("Your key was not accepted. Paste a current key from intervals.icu.", "key");
       return;
     }
     state.status = { kind: err instanceof NetworkError ? "offline" : "error", message: err.message };
@@ -811,7 +897,7 @@ function onVisibility() {
     state.hiddenAt = Date.now();
     return;
   }
-  if (!store.getKey() || !state.model) return;
+  if (!store.getAuth() || !state.model) return;
   const dayChanged = localToday() !== state.today;
   if (dayChanged) {
     state.viewWeek = null;
@@ -827,7 +913,7 @@ function tick() {
     state.viewWeek = null;
     rebuild();
     render();
-    if (store.getKey()) doRefresh();
+    if (store.getAuth()) doRefresh();
   } else {
     updateStatus();
   }
@@ -855,8 +941,10 @@ async function init() {
   document.addEventListener("keydown", onKey);
   document.addEventListener("visibilitychange", onVisibility);
   window.setInterval(tick, 60_000);
-  if (!store.getKey()) {
-    renderSetup("");
+  const callback = readCallback(window.location.search);
+  if (callback && await completeLogin(callback)) return;
+  if (!store.getAuth()) {
+    renderSetup();
     return;
   }
   state.data = store.getCache();

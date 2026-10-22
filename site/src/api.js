@@ -1,4 +1,4 @@
-// Read-only intervals.icu client and the browser-side store (key, cached data, settings).
+// Read-only intervals.icu client and the browser-side store (key or login, cached data, settings).
 import { API_BASE, PLAN, STORAGE_KEYS } from "./config.js";
 
 export class KeyError extends Error {
@@ -27,15 +27,16 @@ export class HttpError extends Error {
 const defaultFetch = (url, init) => globalThis.fetch(url, init);
 const KEY_PATTERN = /^[\x21-\x7e]{8,}$/;
 
-export function authHeader(key) {
-  return `Basic ${btoa(`API_KEY:${key}`)}`;
+// auth is { type: "key", secret } for an API key or { type: "oauth", secret } for a login token.
+export function authHeader(auth) {
+  return auth.type === "oauth" ? `Bearer ${auth.secret}` : `Basic ${btoa(`API_KEY:${auth.secret}`)}`;
 }
 
-export async function request(path, key, fetchImpl = defaultFetch) {
+export async function request(path, auth, fetchImpl = defaultFetch) {
   let res;
   try {
     res = await fetchImpl(`${API_BASE}${path}`, {
-      headers: { Authorization: authHeader(key), Accept: "application/json" },
+      headers: { Authorization: authHeader(auth), Accept: "application/json" },
     });
   } catch {
     throw new NetworkError();
@@ -83,8 +84,16 @@ export function createStore(storage) {
     }
   };
   return {
-    getKey: () => read(STORAGE_KEYS.key),
-    setKey: key => write(STORAGE_KEYS.key, key),
+    getAuth() {
+      const token = read(STORAGE_KEYS.token);
+      if (token) return { type: "oauth", secret: token };
+      const key = read(STORAGE_KEYS.key);
+      return key ? { type: "key", secret: key } : null;
+    },
+    setAuth({ type, secret }) {
+      remove(type === "oauth" ? STORAGE_KEYS.key : STORAGE_KEYS.token);
+      write(type === "oauth" ? STORAGE_KEYS.token : STORAGE_KEYS.key, secret);
+    },
     getCache() {
       const raw = read(STORAGE_KEYS.data);
       if (!raw) return null;
@@ -102,6 +111,7 @@ export function createStore(storage) {
     setShortcut: on => write(STORAGE_KEYS.shortcut, on ? "on" : "off"),
     forget() {
       remove(STORAGE_KEYS.key);
+      remove(STORAGE_KEYS.token);
       remove(STORAGE_KEYS.data);
     },
   };
@@ -157,20 +167,27 @@ export function reduceActivity(a) {
 export async function connect(rawKey, { store, fetchImpl = defaultFetch }) {
   const key = String(rawKey ?? "").trim();
   if (!KEY_PATTERN.test(key)) throw new KeyError("That doesn't look like an intervals.icu API key.", "format");
-  const athlete = await request("/athlete/0", key, fetchImpl);
+  const auth = { type: "key", secret: key };
+  const athlete = await request("/athlete/0", auth, fetchImpl);
   const athleteName = athlete?.name || athlete?.firstname || "";
-  store.setKey(key);
+  store.setAuth(auth);
   store.setCache({ fetchedAt: null, athleteName, events: [], activities: [] });
   return { athleteName };
 }
 
+// After "Log in with intervals.icu": the token reply already carries the athlete's name.
+export function saveLogin(token, athleteName, { store }) {
+  store.setAuth({ type: "oauth", secret: token });
+  store.setCache({ fetchedAt: null, athleteName, events: [], activities: [] });
+}
+
 export async function refresh({ store, today, fetchImpl = defaultFetch, plan = PLAN, now = new Date() }) {
-  const key = store.getKey();
-  if (!key) throw new KeyError("No API key on this device", "missing");
+  const auth = store.getAuth();
+  if (!auth) throw new KeyError("No API key or login on this device", "missing");
   const newest = today < plan.calendarStart ? plan.calendarStart : today;
   const [events, activities] = await Promise.all([
-    request(`/athlete/0/events?oldest=${plan.calendarStart}&newest=${plan.raceDay}`, key, fetchImpl),
-    request(`/athlete/0/activities?oldest=${plan.calendarStart}&newest=${newest}`, key, fetchImpl),
+    request(`/athlete/0/events?oldest=${plan.calendarStart}&newest=${plan.raceDay}`, auth, fetchImpl),
+    request(`/athlete/0/activities?oldest=${plan.calendarStart}&newest=${newest}`, auth, fetchImpl),
   ]);
   const data = {
     fetchedAt: now.toISOString(),
@@ -178,7 +195,7 @@ export async function refresh({ store, today, fetchImpl = defaultFetch, plan = P
     events: (Array.isArray(events) ? events : []).map(reduceEvent),
     activities: (Array.isArray(activities) ? activities : []).map(reduceActivity),
   };
-  // Forget key (or a new key) while this was loading: don't bring the old data back.
-  if (store.getKey() === key) store.setCache(data);
+  // Forget (or a new key or login) while this was loading: don't bring the old data back.
+  if (store.getAuth()?.secret === auth.secret) store.setCache(data);
   return data;
 }

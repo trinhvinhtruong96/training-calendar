@@ -23,7 +23,8 @@ keyboard or screen reader.
   Needs the repo to be public (free plan) and Pages source set to "GitHub Actions".
 - **No personal data in the repo.** No API key, no plan data, no activity data. Strangers who open
   the URL see only the setup screen.
-- **Read-only:** the page only sends `GET` requests to intervals.icu.
+- **Read-only:** the page reads intervals.icu data with `GET` only. The only other requests belong to the
+  login: the token swap (`POST /api/oauth/token`) and logging out (`DELETE /api/v1/disconnect-app`).
 - No framework, no build step, no runtime dependencies. Plain HTML, CSS and ES modules. Dev-only
   tooling is Node's built-in test runner (Node 24 is installed).
 - No external requests other than `https://intervals.icu` (no web fonts, CDNs or analytics).
@@ -48,7 +49,33 @@ fetches fresh data:
 - `GET /api/v1/athlete/0/events?oldest=2026-10-19&newest=2027-01-31`
 - `GET /api/v1/athlete/0/activities?oldest=2026-10-19&newest=<today>`
 
-Auth: HTTP Basic, username `API_KEY`, password = the key the user entered on that device.
+Auth, one of:
+- **Login** ("Log in with intervals.icu", §3a): `Authorization: Bearer <token>`.
+- **API key**: HTTP Basic, username `API_KEY`, password = the key the user entered on that device.
+
+### 3a. Log in with intervals.icu (`src/auth.js`)
+
+OAuth 2 authorization code flow for a **public client with PKCE**, so there is no client secret and no
+server ([intervals.icu OAuth](https://forum.intervals.icu/t/intervals-icu-oauth-support/2759)).
+`OAUTH.clientId` in `src/config.js` holds the registered app's client ID; while it is empty the setup
+screen offers the API key only. The app must be marked "public client", with the redirect URIs
+`https://trinhvinhtruong96.github.io/training-calendar/` and `http://localhost:8080/`.
+
+1. **Start:** 32 random bytes → base64url `code_verifier`; 16 random bytes → `state`. Both are saved in
+   `sessionStorage` (`tc.v1.login`), then the page opens `https://intervals.icu/oauth/authorize` with
+   `client_id`, `redirect_uri` (the page's own address without `index.html`), `scope=CALENDAR:READ,ACTIVITY:READ`,
+   `state`, `code_challenge` (S256) and `code_challenge_method=S256`.
+2. **Return:** intervals.icu opens the page with `?code&state` or `?error`. The page removes the query
+   from the address bar at once, takes and deletes the saved values (one use), and refuses a missing or
+   different `state`. `error=access_denied` shows "Login cancelled."
+3. **Token:** `POST https://intervals.icu/api/oauth/token`, form-encoded `client_id`, `code`, `code_verifier`.
+   The reply carries `access_token`, `scope` and `athlete.name`; the name is used, so no `/athlete/0` call.
+   Both scope areas (calendar, activities) must be granted, as READ or WRITE.
+4. **Saved:** the token in `tc.v1.token` (a saved key is removed, and the other way round).
+5. **Log out:** Settings → Log out clears this device first, then calls `DELETE /api/v1/disconnect-app`
+   (best effort).
+6. A failed return while the device still has a login or key (e.g. an old login link) keeps the calendar
+   and only announces the error.
 
 ## 4. Files
 
@@ -59,15 +86,16 @@ site/                      published to GitHub Pages
   manifest.webmanifest     "Add to home screen"
   sw.js                    offline cache of the app files (never caches API data)
   icons/                   icon.svg, icon-192.png, icon-512.png, apple-touch-icon.png
-  src/config.js            plan constants (§5)
+  src/config.js            plan constants (§5), login settings (§3a)
   src/dates.js             pure: date math (weeks, days, countdown) and formatting
   src/workout.js           pure: workout type, names, notes, steps, pace ranges, workout bar
   src/model.js             pure: days and weeks, run matching, day status, km, labels, header text
   src/api.js               pure-ish: intervals.icu fetch + cache, with injected fetch and storage
+  src/auth.js              pure-ish: "Log in with intervals.icu" (§3a), with injected fetch, storage and crypto
   src/app.js               DOM rendering and interaction (the only module that touches the DOM)
 tools/serve.js             dev-only static server for site/ on http://localhost:8080
 test/
-  dates.test.js, workout.test.js, model.test.js, api.test.js, fixtures.js (synthetic data only)
+  dates.test.js, workout.test.js, model.test.js, api.test.js, auth.test.js, fixtures.js (synthetic data only)
 .github/workflows/pages.yml  test, then deploy site/ on push to main
 package.json               "type": "module", scripts: test, serve
 README.md                  what it is, one-time GitHub setup, connecting the key, local dev, privacy
@@ -144,8 +172,10 @@ Block height by level: rest 20 % · easy 40 % · long 55 % · threshold 70 % · 
 
 ## 7. Screens (`src/app.js`, `index.html`, `styles.css`)
 
-**Setup screen** (no key on this device): short explanation; password field with show/hide;
-"Where do I find it?" link to intervals.icu settings (Developer Settings → API Key); Connect button.
+**Setup screen** (nothing saved on this device): short explanation. With `OAUTH.clientId` set: a
+**Log in with intervals.icu** button with a note that only read access is asked for, and a closed
+**Use an API key instead** section holding the key form. Without it: the key form only. Key form:
+password field with show/hide; link to intervals.icu settings (Developer Settings → API Key); Connect.
 Connect calls `/athlete/0`; on success it saves the key and goes to the calendar; on failure it shows
 the reason (§8). A note says the key is saved only in this browser and the page only reads data.
 
@@ -166,8 +196,9 @@ the reason (§8). A note says the key is saved only in this browser and the page
    (e.g. weight training) are listed as "Also".
 6. **Today button** (floating on phone, in header on PC) and key `T` jump to today. The `T` shortcut
    can be switched off in settings (WCAG 2.1.4, single-key shortcuts).
-7. **Settings dialog:** connected athlete name; theme (System / Light / Dark); `T` shortcut on/off;
-   Refresh; Forget key (removes key and cached data from this browser).
+7. **Settings dialog:** connected athlete name and how (login or API key); theme (System / Light / Dark);
+   `T` shortcut on/off; Refresh; **Log out on this device** or **Forget key on this device** (removes the
+   login or key and cached data from this browser; logging out also ends the login on intervals.icu).
 
 **Layout:** < 720 px one column; ≥ 1024 px two columns (Today + This week left, Plan right);
 720–1023 px one column with the wide plan table.
@@ -188,19 +219,20 @@ the reason (§8). A note says the key is saved only in this browser and the page
 | Situation | Behaviour |
 |---|---|
 | No internet / fetch fails | keep showing the cached copy; header says `Offline · updated <time>`; Retry button |
-| HTTP 401, or 403 whose body is not a Cloudflare block (`cloudflare_error`) | "Key not accepted"; back to the setup screen (cache kept until Forget key) |
+| HTTP 401, or 403 whose body is not a Cloudflare block (`cloudflare_error`) | "Key not accepted" or "Your intervals.icu login has ended"; back to the setup screen (cache kept until Forget/Log out) |
 | Other HTTP error | message with the status; cached copy stays; Retry |
 | No cache and fetch fails | setup or error screen with Retry |
 | Page hidden > 5 min, then shown again | refresh automatically |
 
 **Cache:** `localStorage` key `tc.v1.data` holds `{fetchedAt, athleteName, events, activities}`, reduced to
-the fields in §2. The key is in `tc.v1.key`, the theme in `tc.v1.theme`, the `T` shortcut setting in
-`tc.v1.shortcut`. If `localStorage` is unavailable or full (private mode, quota), values are kept in memory
-for the session and the page keeps working without a saved copy.
+the fields in §2. The key is in `tc.v1.key` or the login token in `tc.v1.token`, the theme in `tc.v1.theme`,
+the `T` shortcut setting in `tc.v1.shortcut`. If `localStorage` is unavailable or full (private mode, quota),
+values are kept in memory for the session and the page keeps working without a saved copy.
 
 **Service worker:** caches the files under `site/` (cache name includes a version) and serves them
 cache-first, falling back to the network, and refreshes the cached copy in the background so a new
-deploy shows on the next visit; it never stores intervals.icu responses.
+deploy shows on the next visit; it never stores intervals.icu responses. Requests are fetched and cached
+without their query, so a login return (`?code=…`) is neither passed on to the host nor cached.
 
 ## 9. Security
 

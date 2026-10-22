@@ -636,6 +636,9 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 .setup-steps li { margin: 4px 0; }
 .setup-form { display: grid; gap: 8px; margin-top: 18px; }
 .setup-form label { font-weight: 700; }
+.key-option { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+.key-option summary { padding: 10px 0; cursor: pointer; font-weight: 600; }
+.key-option[open] summary { margin-bottom: 8px; }
 .key-row { display: flex; gap: 8px; }
 .key-row input {
   flex: 1;
