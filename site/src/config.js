@@ -1,6 +1,6 @@
 // Plan constants. Everything else comes from intervals.icu at runtime.
 export const PLAN = Object.freeze({
-  title: "HM sub-1:30",
+  title: "HM sub-2:00",
   calendarStart: "2026-10-19", // Monday of week 1
   firstDay: "2026-10-20", // first day with a plan entry
   raceDay: "2027-01-10",

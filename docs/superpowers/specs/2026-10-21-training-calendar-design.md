@@ -103,7 +103,7 @@ README.md                  what it is, one-time GitHub setup, connecting the key
 
 ## 5. Plan constants (`src/config.js`)
 
-- Title `HM sub-1:30` (back from `HM sub-2:00` on 2026-10-24); calendar starts Mon 2026-10-19 (week 1); first plan day
+- Title `HM sub-2:00` (title only; the plan itself targets sub-1:30); calendar starts Mon 2026-10-19 (week 1); first plan day
   2026-10-20; race day Sun 2027-01-10 (moved from 2027-01-31 on 2026-10-24); 12 weeks; "Day N of 83" counts from 2026-10-20.
 - Phase names by week: 1 Start · 2–3 Adapt · 4 Light · 5–6 Build · 7 Peak · 8 Light ·
   9 Race-specific · 10 Key week · 11 Taper · 12 Race.
