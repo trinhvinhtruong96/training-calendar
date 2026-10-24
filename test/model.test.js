@@ -7,15 +7,15 @@ import { activities, events } from "./fixtures.js";
 
 const data = { events, activities };
 
-test("model covers 15 weeks from Mon 19 Oct to race day", () => {
+test("model covers 12 weeks from Mon 19 Oct to race day", () => {
   const m = buildModel(data, "2026-10-23");
-  assert.equal(m.days.length, 105);
+  assert.equal(m.days.length, 84);
   assert.equal(m.days[0].date, "2026-10-19");
-  assert.equal(m.days.at(-1).date, "2027-01-31");
-  assert.equal(m.weeks.length, 15);
+  assert.equal(m.days.at(-1).date, "2027-01-10");
+  assert.equal(m.weeks.length, 12);
   assert.equal(m.weeks[0].phase, "Start");
-  assert.equal(m.weeks[11].phase, "Key week");
-  assert.equal(m.weeks[14].phase, "Race");
+  assert.equal(m.weeks[9].phase, "Key week");
+  assert.equal(m.weeks[11].phase, "Race");
 });
 
 test("events outside the plan or of other categories are ignored", () => {
@@ -91,15 +91,15 @@ test("accessible day labels", () => {
 });
 
 test("header text before, during and after the plan", () => {
-  assert.equal(headerInfo("2026-10-15").text, "Plan starts Tue 20 Oct · 108 days to race");
+  assert.equal(headerInfo("2026-10-15").text, "Plan starts Tue 20 Oct · 87 days to race");
   assert.equal(headerInfo("2026-10-15").progress, 0);
   const now = headerInfo("2026-10-21");
-  assert.equal(now.text, "Week 1 of 15 · Day 2 of 104 · 102 days to race");
-  assert.ok(Math.abs(now.progress - 2 / 104) < 1e-9);
-  assert.equal(headerInfo("2027-01-30").text, "Week 15 of 15 · Day 103 of 104 · 1 day to race");
-  assert.equal(headerInfo("2027-01-31").text, "Race day · Sun 31 Jan");
-  assert.equal(headerInfo("2027-02-02").text, "Plan complete · race was Sun 31 Jan");
-  assert.equal(headerInfo("2027-02-02").progress, 1);
+  assert.equal(now.text, "Week 1 of 12 · Day 2 of 83 · 81 days to race");
+  assert.ok(Math.abs(now.progress - 2 / 83) < 1e-9);
+  assert.equal(headerInfo("2027-01-09").text, "Week 12 of 12 · Day 82 of 83 · 1 day to race");
+  assert.equal(headerInfo("2027-01-10").text, "Race day · Sun 10 Jan");
+  assert.equal(headerInfo("2027-01-12").text, "Plan complete · race was Sun 10 Jan");
+  assert.equal(headerInfo("2027-01-12").progress, 1);
 });
 
 test("run summary, including runs with missing numbers", () => {

@@ -4,7 +4,7 @@ Date: 2026-10-21 · Status: draft for review
 
 ## 1. Goal
 
-A web page for the HM sub-1:30 plan (20/10/2026 → race 31/01/2027) that you open on your phone or PC
+A web page for the HM sub-1:30 plan (20/10/2026 → race 10/01/2027) that you open on your phone or PC
 to see where you are in the plan, today's workout, this week, and the whole plan, with your completed
 runs next to the planned workouts. All data is read **live from intervals.icu** in the browser, so
 pace changes after the tests and new runs show up without rebuilding the page. It is published
@@ -46,7 +46,7 @@ Static single page. On load it renders the last saved copy from `localStorage` a
 fetches fresh data:
 
 - `GET /api/v1/athlete/0` (only when connecting a key)
-- `GET /api/v1/athlete/0/events?oldest=2026-10-19&newest=2027-01-31`
+- `GET /api/v1/athlete/0/events?oldest=2026-10-19&newest=2027-01-10`
 - `GET /api/v1/athlete/0/activities?oldest=2026-10-19&newest=<today>`
 
 Auth, one of:
@@ -103,10 +103,10 @@ README.md                  what it is, one-time GitHub setup, connecting the key
 
 ## 5. Plan constants (`src/config.js`)
 
-- Title `HM sub-2:00` (renamed from `HM sub-1:30` on 2026-10-21); calendar starts Mon 2026-10-19 (week 1); first plan day 2026-10-20;
-  race day Sun 2027-01-31; 15 weeks; "Day N of 104" counts from 2026-10-20.
-- Phase names by week: 1 Start · 2–4 Adapt · 5 Light · 6–8 Build · 9 Peak · 10 Light ·
-  11 Race-specific · 12 Key week · 13 Race-specific · 14 Taper · 15 Race.
+- Title `HM sub-1:30` (back from `HM sub-2:00` on 2026-10-24); calendar starts Mon 2026-10-19 (week 1); first plan day
+  2026-10-20; race day Sun 2027-01-10 (moved from 2027-01-31 on 2026-10-24); 12 weeks; "Day N of 83" counts from 2026-10-20.
+- Phase names by week: 1 Start · 2–3 Adapt · 4 Light · 5–6 Build · 7 Peak · 8 Light ·
+  9 Race-specific · 10 Key week · 11 Taper · 12 Race.
 
 ## 6. Data model (`src/dates.js`, `src/workout.js`, `src/model.js`)
 
@@ -180,15 +180,15 @@ Connect calls `/athlete/0`; on success it saves the key and goes to the calendar
 the reason (§8). A note says the key is saved only in this browser and the page only reads data.
 
 **Main page**, in order:
-1. **Header** (sticky): title; `Week W of 15 · Day N of 104 · D days to race`; plan progress bar;
+1. **Header** (sticky): title; `Week W of 12 · Day N of 83 · D days to race`; plan progress bar;
    last updated time + refresh button; settings button.
 2. **Today card:** date, week and phase; workout name; planned distance and time; note line
    (e.g. `+ gym`); workout bar; step list with pace ranges (repeats shown as `10 × 400 m · 4:02–4:08`
    with the rest under it); actual run summary once done. Rest day: rest note and a "Tomorrow" preview.
-   Before 20/10: "Plan starts Tue 20 Oct". After 31/1: "Race done" plus plan totals.
+   Before 20/10: "Plan starts Tue 20 Oct". After 10/1: "Race done" plus plan totals.
 3. **This week:** 7 days (type colour, name, km, status icon + text); km done / planned; previous and
    next week buttons (and swipe on touch); "This week" button returns.
-4. **Plan:** a table with 15 rows (week label + phase) and Mon–Sun columns; each cell is a button with
+4. **Plan:** a table with 12 rows (week label + phase) and Mon–Sun columns; each cell is a button with
    type colour and status icon; test, key and race days are marked; last column km done / planned with
    a bar. Today's cell has a ring.
 5. **Details** (tap any day): bottom sheet on narrow screens, side panel on wide screens: all events of

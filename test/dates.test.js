@@ -23,13 +23,13 @@ test("plan week, day and countdown numbers", () => {
   assert.equal(weekNumber("2026-10-19"), 1);
   assert.equal(weekNumber("2026-10-25"), 1);
   assert.equal(weekNumber("2026-10-26"), 2);
-  assert.equal(weekNumber("2027-01-31"), 15);
+  assert.equal(weekNumber("2027-01-10"), 12);
   assert.equal(weekNumber("2026-10-01"), -2);
   assert.equal(clampWeek(-2), 1);
-  assert.equal(clampWeek(20), 15);
+  assert.equal(clampWeek(20), 12);
   assert.equal(dayNumber("2026-10-21"), 2);
-  assert.equal(totalDays(), 104);
-  assert.equal(daysToRace("2026-10-21"), 102);
+  assert.equal(totalDays(), 83);
+  assert.equal(daysToRace("2026-10-21"), 81);
 });
 
 test("local today uses the device clock around midnight", () => {

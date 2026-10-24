@@ -122,7 +122,7 @@ test("refresh loads the plan range and caches a reduced copy", async () => {
   const data = await refresh({ store, today: "2026-10-21", fetchImpl: f, now: new Date("2026-10-21T03:00:00Z") });
   assert.deepEqual(f.calls.map(c => c.url).sort(), [
     `${BASE}/athlete/0/activities?oldest=2026-10-19&newest=2026-10-21`,
-    `${BASE}/athlete/0/events?oldest=2026-10-19&newest=2027-01-31`,
+    `${BASE}/athlete/0/events?oldest=2026-10-19&newest=2027-01-10`,
   ]);
   assert.equal(data.fetchedAt, "2026-10-21T03:00:00.000Z");
   assert.equal(data.athleteName, "Runner");

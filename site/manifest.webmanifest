@@ -1,7 +1,7 @@
 {
-  "name": "HM sub-2:00 training calendar",
-  "short_name": "HM 2:00",
-  "description": "HM sub-2:00 plan, today's workout and your runs, live from intervals.icu.",
+  "name": "HM sub-1:30 training calendar",
+  "short_name": "HM 1:30",
+  "description": "HM sub-1:30 plan, today's workout and your runs, live from intervals.icu.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
