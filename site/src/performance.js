@@ -3,7 +3,7 @@
 import { PLAN } from "./config.js";
 import { addDays, formatClock, formatDate, formatKm, formatPace } from "./dates.js";
 import { buildModel, isRun } from "./model.js";
-import { flattenSteps, shortName, workoutType } from "./workout.js";
+import { flattenSteps, workoutType } from "./workout.js";
 
 export const WINDOW_DAYS = 10;
 export const CURVE_DAYS = 90;
@@ -370,7 +370,7 @@ function recoveryOf(wellness) {
 
 export function buildPerformance(data, today, plan = PLAN) {
   const from = windowFrom(today);
-  const out = { from, to: today, loaded: false, pace: null, hr: null, settingsNote: null, lines: [], suggestions: [], runs: [] };
+  const out = { from, to: today, loaded: false, pace: null, hr: null, settingsNote: null, lines: [], suggestions: [], limits: { lt: null, easyLimit: null } };
   const perf = data?.performance;
   if (!perf || perf.loadFailed) return out; // nothing could be loaded yet: the card says so
   out.loaded = true;
@@ -385,6 +385,7 @@ export function buildPerformance(data, today, plan = PLAN) {
   out.settingsNote = settingsNote(perf.settings, hrInfo.lt, paceInfo.pace);
   const lt = hrInfo.lt;
   const ctx = { lt, easyLimit: lt ? round5(0.83 * lt) : null };
+  out.limits = ctx;
   const laps = perf.laps ?? {};
 
   // Runs and missed workouts, oldest first.
@@ -403,15 +404,6 @@ export function buildPerformance(data, today, plan = PLAN) {
     }
     for (const a of d.extraRuns) judged.push({ date: d.date, run: a, workout: null, verdict: judge(a, null, laps[a.id], ctx) });
   }
-  out.runs = [
-    ...judged.map(j => ({
-      date: j.date,
-      title: `${formatDate(j.date)} · ${j.workout ? shortName(j.workout.name) : `Run ${formatKm(j.run.distance)} km`}`,
-      status: j.verdict.status,
-      reason: j.verdict.reason,
-    })),
-    ...missed.map(m => ({ date: m.date, title: `${formatDate(m.date)} · ${shortName(m.workout.name)}`, status: "check", reason: "missed" })),
-  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   // Review lines.
   const doneM = days.flatMap(d => d.activities).filter(isRun).reduce((s, a) => s + (a.distance || 0), 0);

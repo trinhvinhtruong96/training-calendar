@@ -30,6 +30,7 @@ export const STORAGE_KEYS = Object.freeze({
   key: "tc.v1.key",
   token: "tc.v1.token",
   data: "tc.v1.data",
+  laps: "tc.v1.laps", // laps per run, for the day details and the Performance card
   theme: "tc.v1.theme",
   shortcut: "tc.v1.shortcut",
   login: "tc.v1.login", // sessionStorage: the PKCE verifier and state while a login is under way

@@ -107,6 +107,15 @@ export function createStore(storage) {
       }
     },
     setCache: data => write(STORAGE_KEYS.data, JSON.stringify(data)),
+    getLaps() {
+      try {
+        const laps = JSON.parse(read(STORAGE_KEYS.laps) ?? "{}");
+        return laps && typeof laps === "object" && !Array.isArray(laps) ? laps : {};
+      } catch {
+        return {};
+      }
+    },
+    setLaps: laps => write(STORAGE_KEYS.laps, JSON.stringify(laps)),
     getTheme: () => read(STORAGE_KEYS.theme) || "system",
     setTheme: theme => write(STORAGE_KEYS.theme, theme),
     getShortcut: () => read(STORAGE_KEYS.shortcut) !== "off",
@@ -115,6 +124,7 @@ export function createStore(storage) {
       remove(STORAGE_KEYS.key);
       remove(STORAGE_KEYS.token);
       remove(STORAGE_KEYS.data);
+      remove(STORAGE_KEYS.laps);
     },
   };
 }
@@ -213,6 +223,31 @@ export function reduceLaps(reply) {
   }));
 }
 
+// Saved laps are kept only for runs the page knows about (the cached activities), never empty.
+export function mergeLaps(store, add, knownIds) {
+  const known = new Set((knownIds ?? []).map(String));
+  const next = {};
+  for (const [id, laps] of Object.entries({ ...store.getLaps(), ...add })) {
+    if (known.has(id) && Array.isArray(laps) && laps.length) next[id] = laps;
+  }
+  store.setLaps(next);
+}
+
+// Laps of one run for the day details: saved → the Performance card's → intervals.icu. Never logs out.
+export async function loadDayLaps(activityId, { store, knownIds, extra = {}, fetchImpl = defaultFetch }) {
+  const id = String(activityId);
+  const saved = store.getLaps()[id] ?? extra?.[id];
+  if (saved?.length) return { laps: saved };
+  const auth = store.getAuth();
+  if (!auth) return { error: true };
+  const res = await softRequest(`/activity/${encodeURIComponent(id)}/intervals`, auth, fetchImpl);
+  if (res.failed) return { error: true };
+  const laps = reduceLaps(res.value);
+  if (!laps.length) return { notReady: true };
+  if (store.getAuth()?.secret === auth.secret) mergeLaps(store, { [id]: laps }, knownIds);
+  return { laps };
+}
+
 export async function connect(rawKey, { store, fetchImpl = defaultFetch }) {
   const key = String(rawKey ?? "").trim();
   if (!KEY_PATTERN.test(key)) throw new KeyError("That doesn't look like an intervals.icu API key.", "format");
@@ -239,7 +274,7 @@ async function softRequest(path, auth, fetchImpl) {
   }
 }
 
-async function loadPerformance({ extras, activities, prev, auth, fetchImpl, today, plan }) {
+async function loadPerformance({ extras, activities, prev, auth, store, fetchImpl, today, plan }) {
   const [pace, hr, wellness, athlete] = await extras;
   const idNow = curveWindow(today);
   const idStart = curveWindow(plan.firstDay);
@@ -247,16 +282,21 @@ async function loadPerformance({ extras, activities, prev, auth, fetchImpl, toda
   const from = windowFrom(today);
   const runs = activities.filter(a => /run/i.test(a.type) && a.distance >= MIN_RUN_M && a.date >= from && a.date <= today);
   const oldLaps = prev?.laps ?? {};
+  const saved = store.getLaps();
+  const alive = () => store.getAuth()?.secret === auth.secret; // Forget / Log out / new key: stop
   const laps = {};
   await Promise.all(runs.map(async a => {
-    if (oldLaps[a.id]?.length) {
-      laps[a.id] = oldLaps[a.id];
+    const known = oldLaps[a.id]?.length ? oldLaps[a.id] : saved[a.id];
+    if (known?.length) {
+      laps[a.id] = known;
       return;
     }
+    if (!alive()) return;
     const res = await softRequest(`/activity/${encodeURIComponent(a.id)}/intervals`, auth, fetchImpl);
     const reduced = res.failed ? [] : reduceLaps(res.value);
     if (reduced.length) laps[a.id] = reduced; // none yet while intervals.icu is analysing: ask again next time
   }));
+  if (alive()) mergeLaps(store, laps, activities.map(a => a.id));
   return {
     paceNow: pace.failed ? prev?.paceNow ?? null : reducePaceCurve(curve(pace, idNow)),
     pacePlanStart: pace.failed ? prev?.pacePlanStart ?? null : reducePaceCurve(curve(pace, idStart)),
@@ -296,7 +336,7 @@ export async function refresh({ store, today, fetchImpl = defaultFetch, plan = P
     athleteName: prev?.athleteName ?? "",
     events: (Array.isArray(events) ? events : []).map(reduceEvent),
     activities: runs,
-    performance: await loadPerformance({ extras, activities: runs, prev: prev?.performance, auth, fetchImpl, today, plan }),
+    performance: await loadPerformance({ extras, activities: runs, prev: prev?.performance, auth, store, fetchImpl, today, plan }),
   };
   // Forget (or a new key or login) while this was loading: don't bring the old data back.
   if (store.getAuth()?.secret === auth.secret) store.setCache(data);
