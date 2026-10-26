@@ -182,8 +182,10 @@ Connect calls `/athlete/0`; on success it saves the key and goes to the calendar
 the reason (§8). A note says the key is saved only in this browser and the page only reads data.
 
 **Main page**, in order:
-1. **Header** (sticky): title; `Week W of 12 · Day N of 83 · D days to race`; plan progress bar;
-   last updated time + refresh button; settings button.
+1. **Header** (sticky): the athlete's intervals.icu name (small, muted, one line; taken from
+   `/athlete/0` on connect and on every refresh, the saved name kept when that reply fails); title;
+   `Week W of 12 · Day N of 83 · D days to race`; plan progress bar; last updated time + refresh button;
+   settings button.
 2. **Today card:** date, week and phase; workout name; planned distance and time; note line
    (e.g. `+ gym`); workout bar; step list with pace ranges (repeats shown as `10 × 400 m · 4:02–4:08`
    with the rest under it); actual run summary once done. Rest day: rest note and a "Tomorrow" preview.

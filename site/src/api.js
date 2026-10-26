@@ -253,12 +253,13 @@ export async function loadDayLaps(activityId, { store, knownIds, extra = {}, fet
   return { laps };
 }
 
+const athleteNameOf = athlete => athlete?.name || athlete?.firstname || "";
+
 export async function connect(rawKey, { store, fetchImpl = defaultFetch }) {
   const key = String(rawKey ?? "").trim();
   if (!KEY_PATTERN.test(key)) throw new KeyError("That doesn't look like an intervals.icu API key.", "format");
   const auth = { type: "key", secret: key };
-  const athlete = await request("/athlete/0", auth, fetchImpl);
-  const athleteName = athlete?.name || athlete?.firstname || "";
+  const athleteName = athleteNameOf(await request("/athlete/0", auth, fetchImpl));
   store.setAuth(auth);
   store.setCache({ fetchedAt: null, athleteName, events: [], activities: [] });
   return { athleteName };
@@ -336,12 +337,15 @@ export async function refresh({ store, today, fetchImpl = defaultFetch, plan = P
   ]);
   const prev = store.getCache();
   const runs = (Array.isArray(activities) ? activities : []).map(reduceActivity);
+  const performance = await loadPerformance({ extras, activities: runs, prev: prev?.performance, auth, store, fetchImpl, today, plan });
+  const [, , , athlete] = await extras;
   const data = {
     fetchedAt: now.toISOString(),
-    athleteName: prev?.athleteName ?? "",
+    // The name can change on intervals.icu; a failed or nameless reply keeps the saved one.
+    athleteName: athleteNameOf(athlete.value) || prev?.athleteName || "",
     events: (Array.isArray(events) ? events : []).map(reduceEvent),
     activities: runs,
-    performance: await loadPerformance({ extras, activities: runs, prev: prev?.performance, auth, store, fetchImpl, today, plan }),
+    performance,
   };
   // Forget (or a new key or login) while this was loading: don't bring the old data back.
   if (store.getAuth()?.secret === auth.secret) store.setCache(data);

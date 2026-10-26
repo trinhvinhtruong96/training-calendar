@@ -19,9 +19,10 @@ Live site: <https://trinhvinhtruong96.github.io/training-calendar/>
 3. Optional: add it to your home screen (iPhone Safari: Share → Add to Home Screen; Android Chrome:
    ⋮ → Add to Home screen).
 
-Runs appear after your watch syncs them to Garmin Connect and intervals.icu. Changes to the plan in
-intervals.icu (for example new paces after a test) show up the next time the page refreshes. Press
-**T** to jump to today; you can switch that shortcut off in Settings.
+The top of the page shows whose plan it is (the name on the intervals.icu account). Runs appear after your
+watch syncs them to Garmin Connect and intervals.icu. Changes to the plan or your name in intervals.icu (for
+example new paces after a test) show up the next time the page refreshes. Press **T** to jump to today; you
+can switch that shortcut off in Settings.
 
 Tap a day to see its details. For a day with a run, **Steps** shows each planned step with what was
 expected and what you ran (pace, time, HR), a bar that places your pace (or HR on easy steps) against the

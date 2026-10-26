@@ -150,9 +150,11 @@ function statusText() {
 
 function renderHeader() {
   const info = headerInfo(state.today, PLAN);
+  const name = state.data?.athleteName;
   return h("header", { class: "top" },
     h("div", { class: "top-inner" },
       h("div", { class: "brand" },
+        name ? h("p", { class: "who", text: name }) : "",
         h("h1", { text: PLAN.title }),
         h("p", { class: "sub", text: info.text })),
       h("div", { class: "actions" },

@@ -233,6 +233,15 @@ kbd {
   gap: 12px;
 }
 .brand { min-width: 0; }
+.who {
+  margin: 0 0 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .brand h1 { margin: 0; font-size: 1.2rem; }
 .sub { margin: 2px 0 0; font-size: 0.82rem; color: var(--muted); }
 .actions { display: flex; align-items: center; gap: 6px; flex: none; }
@@ -653,7 +662,7 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 .key-row input[aria-invalid="true"] { border-color: var(--danger); }
 .error { margin: 0; min-height: 1.5em; color: var(--danger); font-weight: 600; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.loading { display: grid; justify-items: center; gap: 12px; text-align: center; }
+.setup-card.loading { display: grid; justify-items: center; gap: 12px; text-align: center; }
 .spinner {
   width: 32px;
   height: 32px;
