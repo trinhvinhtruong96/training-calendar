@@ -34,6 +34,8 @@ Out of scope: second-by-second streams, editing anything in intervals.icu, chart
 
 ## 2. What the day details show
 
+(Display superseded by 2026-10-26-steps-display-design.md: Expected/Actual lines, bars, repeat tables.)
+
 For each planned workout with a run, under the existing "Your run" box, a **Steps** section:
 
 - One row per planned step: **step name**, **planned** (amount and pace range), **done** (distance or time,

@@ -23,9 +23,10 @@ Runs appear after your watch syncs them to Garmin Connect and intervals.icu. Cha
 intervals.icu (for example new paces after a test) show up the next time the page refreshes. Press
 **T** to jump to today; you can switch that shortcut off in Settings.
 
-Tap a day to see its details. For a day with a run, **Steps** shows what you ran in each planned step
-(pace, time, HR) against the plan, with ✓ or !. The laps are loaded the first time you open the day and then
-saved in your browser.
+Tap a day to see its details. For a day with a run, **Steps** shows each planned step with what was
+expected and what you ran (pace, time, HR), a bar that places your pace (or HR on easy steps) against the
+plan, and ✓ or !. Repeats show one dot per rep and open into a table. The laps are loaded the first time you
+open the day and then saved in your browser.
 
 ## One-time GitHub setup
 

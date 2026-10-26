@@ -77,8 +77,8 @@ For warm-up, easy and cool-down steps with an HR and a known easy limit. Scale: 
 ### 4.3 Repeat strip
 
 For a repeat with exactly one work step (a step with a pace range that is not warm-up/easy/cool-down): one
-pace bar on the work step's scale with one dot per done rep. Dots are slightly transparent so reps at the
-same pace stack darker. Repeats with several work steps (Settle + Threshold) or no work step (strides) have
+pace bar on the work step's scale with one dot per done rep. Each dot has its rep's own colour (✓ / ! / none);
+dots are slightly transparent so reps at the same pace stack darker. Repeats with several work steps (Settle + Threshold) or no work step (strides) have
 no strip; their table has the detail.
 
 ### 4.4 Common rules
@@ -91,7 +91,9 @@ no strip; their table has the detail.
 - No bar when the value (pace or HR) is missing, when an HR bar has no easy limit, or when a pace step has no
   planned range.
 - Bars and the legend are `aria-hidden`; the Expected/Actual/difference text carries all of it. In forced
-  colours (Windows high contrast) the bar parts keep their colours, like the existing meters.
+  colours (Windows high contrast) the bars use system colours so they show on any canvas: track `Canvas` with a
+  `CanvasText` border, band `Highlight`, dot, limit tick and legend dot `CanvasText` (no status colour there;
+  the text says ✓ / !).
 
 ## 5. Repeats
 
@@ -124,8 +126,9 @@ several. `aria-expanded`, `aria-controls`; open state and focus survive a refres
 
 - Step item: `{ kind: "step", name, status, reason, expected, actual, bar, diff }`
 - Repeat item: `{ kind: "repeat", name, status, reason, expected, actual, bar, diff, label, table }`
-- `bar`: `null` or `{ kind: "pace" | "hr", lo, hi, at, off, dots }` — `lo`/`hi` band edges and `at` the dot
-  in % (0–100); `off` `"low" | "high" | null`; `dots` (strip only) `[{ at, off }]`, and then `at` is `null`.
+- `bar`: `null` or `{ kind: "pace" | "hr", lo, hi, at, off, status, dots }` — `lo`/`hi` band edges and `at` the
+  dot in % (0–100); `off` `"low" | "high" | null`; `status` the item's status (dot colour); `dots` (strip only)
+  `[{ at, off, status }]` with each rep's own status, and then `at`, `off` and `status` are `null`.
 - `diff`: `null` or `{ label: "Pace" | "HR", text }`; the colour comes from the item's `status`.
 - `label`: `"reps"` or `"blocks"` (button text).
 - `table`: `{ columns: "single" | "multi", target: string | null, rows }`; a row is
