@@ -74,8 +74,10 @@ function racePaceOf(events, today) {
   return step ? (step.pace.start + step.pace.end) / 2 : null;
 }
 
-function paceTile(perf, events, today, plan) {
-  const now = thresholdPace(perf.paceNow);
+// hardEffort: the HR curve shows a hard effort (or the athlete records no HR, so it can't tell). Without one, a
+// critical-speed model fitted to easy runs only would give a meaningless "threshold" (spec §1: Baobao001).
+function paceTile(perf, events, today, plan, hardEffort) {
+  const now = hardEffort ? thresholdPace(perf.paceNow) : null;
   const tile = { label: "Threshold pace", value: now ? `${formatPace(now)} /km` : null, lines: [] };
   if (!now) {
     tile.lines.push({ kind: "muted", text: "Not enough hard running yet: a test or race sets it." });
@@ -371,8 +373,8 @@ export function buildPerformance(data, today, plan = PLAN) {
   if (!perf || perf.loadFailed) return out; // nothing could be loaded yet: the card says so
   out.loaded = true;
 
-  const paceInfo = paceTile(perf, data.events ?? [], today, plan);
   const hrInfo = hrTile(perf, today, plan);
+  const paceInfo = paceTile(perf, data.events ?? [], today, plan, Boolean(hrInfo.lt) || !(perf.hrNow?.h1 > 0));
   out.pace = paceInfo.tile;
   out.hr = hrInfo.tile;
   out.settingsNote = settingsNote(perf.settings, hrInfo.lt, paceInfo.pace);

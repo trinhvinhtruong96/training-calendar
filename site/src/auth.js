@@ -67,7 +67,7 @@ function takeSaved(session) {
   return saved;
 }
 
-// Every READ scope the page asks for must be granted, as READ or WRITE.
+// Every scope area the page requires must be granted, as READ or WRITE.
 function missingScopes(granted, wanted) {
   const have = new Set(String(granted).split(",").map(s => s.trim().split(":")[0]));
   return wanted.split(",").map(s => s.split(":")[0]).filter(area => !have.has(area));
@@ -99,7 +99,7 @@ export async function finishLogin(callback, { session, fetchImpl = defaultFetch,
     throw new LoginError(`Login failed (HTTP ${res.status}${detail}). Log in again.`, "failed");
   }
   if (!body?.access_token) throw new LoginError("Login failed: intervals.icu sent no token. Log in again.", "failed");
-  if (body.scope != null && missingScopes(body.scope, config.scope).length) {
+  if (body.scope != null && missingScopes(body.scope, config.requiredScope ?? config.scope).length) {
     throw new LoginError("The page needs read access to both your calendar and your activities. Log in again and allow both.", "scope");
   }
   return { token: body.access_token, athleteName: body.athlete?.name ?? "" };

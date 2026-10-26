@@ -121,8 +121,13 @@ test("refresh loads the plan range and caches a reduced copy", async () => {
   });
   const data = await refresh({ store, today: "2026-10-21", fetchImpl: f, now: new Date("2026-10-21T03:00:00Z") });
   assert.deepEqual(f.calls.map(c => c.url).sort(), [
-    `${BASE}/athlete/0/activities?oldest=2026-10-19&newest=2026-10-21`,
+    `${BASE}/activity/i11/intervals`,
+    `${BASE}/athlete/0`,
+    `${BASE}/athlete/0/activities?oldest=2026-10-12&newest=2026-10-21`,
     `${BASE}/athlete/0/events?oldest=2026-10-19&newest=2027-01-10`,
+    `${BASE}/athlete/0/hr-curves?type=Run&curves=r.2026-07-24.2026-10-21,r.2026-07-23.2026-10-20`,
+    `${BASE}/athlete/0/pace-curves?type=Run&curves=r.2026-07-24.2026-10-21,r.2026-07-23.2026-10-20`,
+    `${BASE}/athlete/0/wellness?oldest=2026-09-17&newest=2026-10-21&fields=id,restingHR,ctl,atl`,
   ]);
   assert.equal(data.fetchedAt, "2026-10-21T03:00:00.000Z");
   assert.equal(data.athleteName, "Runner");
@@ -137,7 +142,7 @@ test("refresh before the plan starts still asks for a valid activity range", asy
   store.setAuth(KEY);
   const f = fakeFetch({ "/athlete/0/events": reply(200, []), "/athlete/0/activities": reply(200, []) });
   await refresh({ store, today: "2026-10-01", fetchImpl: f });
-  assert.ok(f.calls.some(c => c.url.endsWith("/athlete/0/activities?oldest=2026-10-19&newest=2026-10-19")));
+  assert.ok(f.calls.some(c => c.url.endsWith("/athlete/0/activities?oldest=2026-09-22&newest=2026-10-19")));
 });
 
 test("refresh without a key asks for one", async () => {

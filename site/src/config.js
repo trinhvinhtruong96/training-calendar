@@ -20,7 +20,10 @@ export const OAUTH = Object.freeze({
   clientId: "",
   authorizeUrl: "https://intervals.icu/oauth/authorize",
   tokenUrl: "https://intervals.icu/api/oauth/token",
-  scope: "CALENDAR:READ,ACTIVITY:READ",
+  // Asked for at login. WELLNESS and SETTINGS feed the Performance card and may be declined.
+  scope: "CALENDAR:READ,ACTIVITY:READ,WELLNESS:READ,SETTINGS:READ",
+  // A login without these is refused.
+  requiredScope: "CALENDAR:READ,ACTIVITY:READ",
 });
 
 export const STORAGE_KEYS = Object.freeze({
