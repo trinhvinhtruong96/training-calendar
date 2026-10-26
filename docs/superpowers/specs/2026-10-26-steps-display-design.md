@@ -13,7 +13,7 @@ the pace (or HR) easy to read at a glance.
 **Success:** opening Truong's week 1 days shows:
 
 - **Wed 21 Oct:** Warm-up ✓ with Expected "1.6 km · 5:30–5:50 /km · HR ≤ 150", Actual "1.61 km · 8:40 ·
-  5:24 /km · HR 143 (136–156)", an HR bar with the dot at 143 inside the band (limit 150) and "7 below the
+  5:24 /km · HR 143 · max 171", an HR bar with the dot at 143 inside the band (limit 150) and "7 below the
   limit". The repeat "10 × 400 m" ! with Expected "4:02–4:08 /km · 90 s rest", Actual "reps 3:25–3:56", ten
   dots on one strip (rep 10, 3:25, as an arrow at the fast edge) and "10 too fast". "Show reps" opens a table
   with 10 rep rows and their rests.
@@ -42,15 +42,15 @@ Every step row, in this order:
 2. **Expected** line (muted label): the planned amount and pace range, plus the HR limit where a check uses
    one: "HR ≤ {easyLimit}" for warm-up/easy/cool-down, "HR ≤ {lt}" for threshold/settle/tempo. No limit known
    → no HR part. Example: "2 km · 4:25–4:35 /km · HR ≤ 180".
-3. **Actual** line (muted label): distance, time, pace, HR. Distance step: "2 km · 8:24 · 4:12 /km · HR 182
-   (182–183)". Timed step: "3:09 · 214 m · HR 151". HR is the time-weighted average; with 2+ laps whose averages
-   differ, the lap range follows in brackets.
+3. **Actual** line (muted label): distance, time, pace, HR. Distance step: "2 km · 8:24 · 4:12 /km · HR 182 ·
+   max 185". Timed step: "3:09 · 214 m · HR 151 · max 185". HR is the time-weighted average; "max" is the
+   highest lap peak (`max_heartrate`), left out when the laps carry none.
 4. **Bar** (§4), when the step has one.
 5. **Difference line**: the bar's name on the left ("Pace" or "HR"), the result on the right in the status
    colour (green ✓, red !, muted otherwise):
-   - Pace: "in range"; outside the planned range by n s (rounded, measured from the nearer end): "n s too
-     fast" / "n s too slow" when the step is !, "n s fast" / "n s slow" when it is ✓ (inside the tolerance),
-     "n s slower than plan" for the threshold/settle/tempo note (no !).
+   - Pace: "plan {range} · " then "in range", or the pace difference per km from the nearer end of the range
+     (rounded): "n s/km too fast" / "n s/km too slow" when the step is !, "n s/km fast" / "n s/km slow" when it
+     is ✓ (inside the tolerance), "n s/km slower than plan" for the threshold/settle/tempo note (no !).
    - HR: "n below the limit", "at the limit", "n above the limit" (n = average − easyLimit).
    - Threshold/settle/tempo whose HR check fails: " · HR above {lt}" is added to the pace text.
    No bar → no difference line, except the threshold HR failure, which then shows alone ("HR above 180").
@@ -108,14 +108,20 @@ several. `aria-expanded`, `aria-controls`; open state and focus survive a refres
 
 **Table** (a real `<table>` with a visually hidden caption, e.g. "Reps of 10 × 400 m", and `th scope="col"`):
 
+- **Look:** the table sits in a rounded card (border, tinted header row, small-caps headers); number columns
+  (Dist, Time, Pace, HR) are right-aligned; Pace is bold; one divider per step together with its rest line.
+  On the details sheet the card uses 12 px of the sheet's side padding so it fits a 390 px phone.
 - **One work step:** a line above the table "Expected 400 m @4:02–4:08 /km · 90 s rest"; columns **#**,
-  **Time**, **Pace**, **vs plan**, **HR**, status. Each rest is a muted row spanning the columns under its
-  rep: "rest 1:30 · 100 m · HR 149".
-- **Several work steps or none:** columns **Step**, **Dist**, **Time**, **Pace**, **vs plan**, **HR**,
-  status; each round is its own `<tbody>` headed by a "Block n" row (spanning, `th scope="rowgroup"`). Rest/walk/stride rows
-  are muted and have no "vs plan" and no status.
-- **vs plan:** "n s fast" / "n s slow" from the nearer end of the work step's range, or "in range".
-- HR = time-weighted average of the row's laps. Status cell: icon with a spoken label.
+  **Time**, **Pace**, **vs plan**, **HR**. Each rest is a thin muted line under its rep:
+  "↳ rest 1:30 · 100 m · HR 149" (average only: a rest's peak is the end of the rep).
+- **Several work steps or none:** columns **Step**, **Dist**, **Time**, **Pace**, **vs plan**, **HR**; each
+  round is its own `<tbody>` headed by a "Block n" row (spanning, `th scope="rowgroup"`). A rest/walk after a
+  step of the same round is a "↳" line under it; a step without a pace target that starts a round (a stride)
+  keeps a full row without "vs plan".
+- **Status:** ✓ / ! in the first cell, before the rep number or step name, with a spoken label ("1, check").
+- **vs plan:** two lines: "plan 4:02–4:08" (small, muted), then a pill "6 s/km fast" / "3 s/km slow" /
+  "in range" — green for ✓ (also inside the tolerance), red for !; text ≥ 4.5:1 on the pill in both themes.
+- **HR:** time-weighted average, with "max 182" (highest lap peak) small underneath.
 - Only rounds with laps appear (a run stopped early shows the done rounds; "Not done" stays as today).
 - The table scrolls sideways inside its box on very narrow screens.
 
@@ -132,8 +138,9 @@ several. `aria-expanded`, `aria-controls`; open state and focus survive a refres
 - `diff`: `null` or `{ label: "Pace" | "HR", text }`; the colour comes from the item's `status`.
 - `label`: `"reps"` or `"blocks"` (button text).
 - `table`: `{ columns: "single" | "multi", target: string | null, rows }`; a row is
-  `{ kind: "work" | "rest" | "block", n, step, dist, time, pace, vs, hr, status }` (fields not used by a
-  kind are empty strings; `block` rows have only `n`).
+  `{ kind: "work" | "rest" | "block", n, step, dist, time, pace, plan, vs, hr, hrMax, status, attached }`
+  (strings except `n`, `status`, `attached`; fields not used by a kind are empty strings; `block` rows have
+  only `n`; `attached` = a rest/walk drawn as a line under the step before it in the same round).
 
 `app.js` renders these as described in §3–§5 and keeps everything else (loading, errors, Try again, saved laps,
 open tables and focus across refreshes) unchanged.

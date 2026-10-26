@@ -62,8 +62,8 @@ The Performance card loses its "Each run" button and list; everything else on it
 ## 3. Data
 
 - **Saved laps:** a new storage key `tc.v1.laps` holds `{ [activityId]: [{distance, movingTime, elapsedTime,
-  avgHr}] }` (the Performance card's reduced lap shape plus `elapsedTime`; laps saved without it are fetched
-  again). Written only for non-empty replies. On every write it
+  avgHr, maxHr}] }` (the Performance card's reduced lap shape plus `elapsedTime` and `maxHr`; laps saved
+  without them are fetched again). Written only for non-empty replies. On every write it
   is pruned to activity ids present in the current cached `activities`. `store.forget()` removes it.
 - **Where the details get laps**, in order: `tc.v1.laps` → `data.performance.laps` → `GET
   /activity/{id}/intervals` (reduced with the existing `reduceLaps`).

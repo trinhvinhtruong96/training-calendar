@@ -743,16 +743,29 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 .step-row.s-ok .step-diff-text { color: var(--ok); }
 .step-row.s-check .step-diff-text { color: var(--danger); font-weight: 700; }
 .step-body .btn.small { margin-top: 8px; }
-.reps-wrap { margin-top: 8px; }
+.step-row > .reps-wrap { grid-column: 1 / -1; margin: 4px -12px 0; } /* uses part of the sheet's 20 px side padding */
 .reps-wrap[hidden] { display: none; }
-.reps-scroll { position: relative; overflow-x: auto; } /* relative: keeps the status cells' .sr-only labels inside the scroll box */
+/* relative: keeps the first cells' .sr-only labels inside the scroll box */
+.reps-scroll { position: relative; overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
 .reps-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-.reps-table th { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); text-align: left; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
-.reps-table td { padding: 4px 8px 4px 0; white-space: nowrap; }
-.reps-table .rt-rest td { padding-top: 0; font-size: 0.8rem; color: var(--muted); }
-.reps-table .rt-block th { padding-top: 8px; border-bottom: 0; }
-.reps-table tr.s-check .rt-vs, .reps-table tr.s-check .rt-status { color: var(--danger); font-weight: 700; }
-.reps-table tr.s-ok .rt-status { color: var(--ok); font-weight: 700; }
+.reps-table th, .reps-table td { padding: 7px 4px; text-align: left; vertical-align: middle; white-space: nowrap; }
+.reps-table th:first-child, .reps-table td:first-child { padding-left: 10px; }
+.reps-table th:last-child, .reps-table td:last-child { padding-right: 10px; }
+.reps-table .num { text-align: right; }
+.reps-table thead th { background: color-mix(in srgb, var(--muted) 12%, transparent); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.reps-table .rt-main { border-top: 1px solid var(--border); }
+.reps-table thead + tbody .rt-main:first-child { border-top: 0; }
+.reps-table .rt-block th { padding: 10px 10px 4px; border-top: 1px solid var(--border); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.reps-table thead + tbody .rt-block th { border-top: 0; }
+.reps-table .rt-rest td { padding: 0 10px 7px 26px; font-size: 0.8rem; color: var(--muted); }
+.reps-table .rt-pace { font-weight: 700; }
+.rt-icon { display: inline-block; width: 12px; margin-right: 4px; font-weight: 800; color: var(--muted); }
+.rt-icon.s-ok { color: var(--ok); }
+.rt-icon.s-check { color: var(--danger); }
+.rt-sub { display: block; font-size: 0.7rem; font-weight: 400; color: var(--muted); }
+.pill { display: inline-block; margin-top: 2px; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.pill.s-ok { color: color-mix(in srgb, var(--ok) 80%, var(--fg)); background: color-mix(in srgb, var(--ok) 14%, transparent); } /* text ≥ 4.5:1 on the tint */
+.pill.s-check { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
 
 @media (max-width: 719px) {
   .grid-wrap { display: none; }
@@ -814,4 +827,5 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
   .step-bar::before { background: Canvas; border: 1px solid CanvasText; }
   .bar-band, .legend-band { background: Highlight; }
   .bar-dot, .bar-dot.s-ok, .bar-dot.s-check, .bar-limit, .legend-dot { background: CanvasText; }
+  .pill { border: 1px solid CanvasText; }
 }

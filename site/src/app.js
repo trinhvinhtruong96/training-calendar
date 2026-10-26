@@ -407,34 +407,48 @@ function stepBar(bar) {
 function repeatRow(it, run, i) {
   const id = `reps-${run.id}-${i}`;
   const open = state.openReps.has(id);
-  return stepRow(it,
+  const li = stepRow(it,
     h("button", {
       type: "button", class: "btn ghost small", "aria-expanded": String(open), "aria-controls": id,
       "data-key": `steps:${run.id}:reps:${i}`, "data-noun": it.label, onclick: e => toggleReps(e.currentTarget, id),
-    }, `${open ? "Hide" : "Show"} ${it.label}`),
-    h("div", { class: "reps-wrap", id, hidden: !open }, repsTable(it)));
+    }, `${open ? "Hide" : "Show"} ${it.label}`));
+  li.append(h("div", { class: "reps-wrap", id, hidden: !open }, repsTable(it))); // full row width, under the icon too
+  return li;
 }
 
-// Compact table of a repeat (display spec §5): one work step → # Time Pace vs-plan HR, rests as thin rows;
-// otherwise Step Dist Time Pace vs-plan HR, each round in its own tbody headed "Block n" (scope rowgroup).
+// Compact table of a repeat (display spec §5): status with # (or Step) first, then Time, Pace, vs plan (plan pace
+// and a difference pill), HR (average, peak below). A rest/walk after a step is a thin "↳" line under it. With
+// several work steps each round is its own tbody headed "Block n" (scope rowgroup).
 function repsTable(it) {
   const t = it.table;
   const single = t.columns === "single";
-  const heads = single ? ["#", "Time", "Pace", "vs plan", "HR"] : ["Step", "Dist", "Time", "Pace", "vs plan", "HR"];
-  const span = heads.length + 1;
-  const statusCell = status => {
-    const s = PERF_STATUS[status ?? "none"];
-    return h("td", { class: "rt-status" }, h("span", { "aria-hidden": "true", text: s.icon }), s.label ? h("span", { class: "sr-only", text: s.label }) : "");
+  const heads = single
+    ? [["#", null], ["Time", "num"], ["Pace", "num"], ["vs plan", null], ["HR", "num"]]
+    : [["Step", null], ["Dist", "num"], ["Time", "num"], ["Pace", "num"], ["vs plan", null], ["HR", "num"]];
+  const span = heads.length;
+  const num = (text, extra = "") => h("td", { class: `num${extra}`, text });
+  const firstCell = r => {
+    const s = PERF_STATUS[r.status ?? "none"];
+    return h("td", { class: "rt-first" },
+      h("span", { class: `rt-icon s-${r.status ?? "none"}`, "aria-hidden": "true", text: s.icon }),
+      single ? h("strong", { text: String(r.n) }) : r.step,
+      s.label ? h("span", { class: "sr-only", text: `, ${s.label.toLowerCase()}` }) : "");
   };
   const row = r => {
-    if (single && r.kind === "rest") {
-      return h("tr", { class: "rt-rest" }, h("td", { colspan: span, text: `${r.step.toLowerCase()} ${r.time} · ${r.dist}${r.hr ? ` · HR ${r.hr}` : ""}` }));
+    if (r.attached) {
+      return h("tr", { class: "rt-rest" }, h("td", { colspan: span },
+        h("span", { "aria-hidden": "true", text: "↳ " }),
+        `${r.step.toLowerCase()} ${r.time} · ${r.dist}${r.hr ? ` · HR ${r.hr}` : ""}`));
     }
-    const cells = single ? [String(r.n), r.time, r.pace, r.vs, r.hr] : [r.step, r.dist, r.time, r.pace, r.vs, r.hr];
-    const vsAt = cells.length - 2;
-    return h("tr", { class: `${r.kind === "rest" ? "rt-rest " : ""}s-${r.status ?? "none"}` },
-      cells.map((c, k) => h("td", { class: k === vsAt ? "rt-vs" : null, text: c })),
-      statusCell(r.status));
+    return h("tr", { class: "rt-main" },
+      firstCell(r),
+      single ? "" : num(r.dist),
+      num(r.time),
+      num(r.pace, " rt-pace"),
+      h("td", { class: "rt-vs" },
+        r.plan ? h("span", { class: "rt-sub", text: `plan ${r.plan}` }) : "",
+        r.vs ? h("span", { class: `pill s-${r.status ?? "none"}`, text: r.vs }) : ""),
+      h("td", { class: "num" }, r.hr, r.hrMax ? h("span", { class: "rt-sub", text: `max ${r.hrMax}` }) : ""));
   };
   const bodies = [];
   for (const r of t.rows) {
@@ -450,9 +464,7 @@ function repsTable(it) {
     h("div", { class: "reps-scroll" },
       h("table", { class: "reps-table" },
         h("caption", { class: "sr-only", text: `${it.label === "blocks" ? "Blocks" : "Reps"} of ${it.name}` }),
-        h("thead", {}, h("tr", {},
-          heads.map(x => h("th", { scope: "col", text: x })),
-          h("th", { scope: "col" }, h("span", { class: "sr-only", text: "Status" })))),
+        h("thead", {}, h("tr", {}, heads.map(([x, cls]) => h("th", { scope: "col", class: cls, text: x })))),
         bodies.map(rows => h("tbody", {}, rows)))),
   ];
 }

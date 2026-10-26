@@ -221,11 +221,12 @@ export function reduceLaps(reply) {
     movingTime: l.moving_time ?? 0,
     elapsedTime: l.elapsed_time ?? l.moving_time ?? 0,
     avgHr: l.average_heartrate ?? null,
+    maxHr: l.max_heartrate ?? null,
   }));
 }
 
-// Usable saved laps: non-empty and in the current shape (laps saved before elapsedTime are fetched again).
-const lapsOk = laps => Array.isArray(laps) && laps.length > 0 && laps[0].elapsedTime !== undefined;
+// Usable saved laps: non-empty and in the current shape (laps saved before elapsedTime or maxHr are fetched again).
+const lapsOk = laps => Array.isArray(laps) && laps.length > 0 && laps[0].elapsedTime !== undefined && laps[0].maxHr !== undefined;
 
 // Saved laps are kept only for runs the page knows about (the cached activities), never empty.
 export function mergeLaps(store, add, knownIds) {

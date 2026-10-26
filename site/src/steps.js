@@ -39,30 +39,28 @@ function paceSpan(paces) {
   return lo === hi ? lo : `${lo}–${hi}`;
 }
 
-// Distance, time, pace and time-weighted HR of some laps.
+// Distance, time, pace, time-weighted HR and the highest lap peak HR of some laps.
 function totals(laps) {
   const distance = laps.reduce((s, l) => s + (l.distance || 0), 0);
   const time = laps.reduce((s, l) => s + (l.movingTime || 0), 0);
   const elapsed = laps.reduce((s, l) => s + elapsedOf(l), 0);
   const withHr = laps.filter(l => l.avgHr > 0 && l.movingTime > 0);
   const hrTime = withHr.reduce((s, l) => s + l.movingTime, 0);
-  const hrs = withHr.map(l => Math.round(l.avgHr));
+  const peaks = laps.map(l => l.maxHr).filter(v => v > 0);
   return {
     distance,
     time,
     elapsed,
     pace: paceOf(distance, time),
     hr: hrTime ? Math.round(withHr.reduce((s, l) => s + l.avgHr * l.movingTime, 0) / hrTime) : null,
-    hrLo: hrs.length ? Math.min(...hrs) : null,
-    hrHi: hrs.length ? Math.max(...hrs) : null,
-    laps: laps.length,
+    hrMax: peaks.length ? Math.round(Math.max(...peaks)) : null,
   };
 }
 
-// "HR 143", or "HR 143 (136–156)" when the step's laps differ.
+// "HR 143 · max 171"; just "HR 143" when the laps carry no peak.
 function hrText(t) {
   if (t.hr == null) return "";
-  return t.laps >= 2 && t.hrLo !== t.hrHi ? ` · HR ${t.hr} (${t.hrLo}–${t.hrHi})` : ` · HR ${t.hr}`;
+  return t.hrMax != null ? ` · HR ${t.hr} · max ${t.hrMax}` : ` · HR ${t.hr}`;
 }
 
 const distText = metres => (metres < 1000 ? `${Math.round(metres)} m` : `${formatKm(metres, 2)} km`);
@@ -153,10 +151,10 @@ function gapOf(pace, range) {
   return 0;
 }
 
-// Table wording: "6 s fast" / "3 s slow" / "in range".
+// Table wording: "6 s/km fast" / "3 s/km slow" / "in range" (pace per km, not time).
 function vsText(pace, range) {
   const n = gapOf(pace, range);
-  return n === 0 ? "in range" : `${Math.abs(n)} s ${n < 0 ? "fast" : "slow"}`;
+  return n === 0 ? "in range" : `${Math.abs(n)} s/km ${n < 0 ? "fast" : "slow"}`;
 }
 
 // Difference-line wording: "too" only when the verdict says so; the threshold note says "slower than plan".
@@ -164,9 +162,9 @@ function paceDiffText(pace, range, verdict) {
   const n = gapOf(pace, range);
   if (n === 0) return "in range";
   const side = n < 0 ? "fast" : "slow";
-  if (verdict.reason.includes(`too ${side}`)) return `${Math.abs(n)} s too ${side}`;
-  if (verdict.reason === "slower than planned") return `${n} s slower than plan`;
-  return `${Math.abs(n)} s ${side}`;
+  if (verdict.reason.includes(`too ${side}`)) return `${Math.abs(n)} s/km too ${side}`;
+  if (verdict.reason === "slower than planned") return `${n} s/km slower than plan`;
+  return `${Math.abs(n)} s/km ${side}`;
 }
 
 function hrDiffText(hr, limit) {
@@ -185,7 +183,7 @@ function stepVisual(step, t, verdict, limits) {
   }
   const hrFail = /HR above \d+/.exec(verdict.reason)?.[0] ?? "";
   if (isPaceCue(cue) && range && t.pace != null) {
-    const text = [paceDiffText(t.pace, range, verdict), hrFail].filter(Boolean).join(" · ");
+    const text = [`plan ${paceRange(step.pace)}`, paceDiffText(t.pace, range, verdict), hrFail].filter(Boolean).join(" · ");
     return { bar: paceBar(range, t.pace, verdict.status), diff: { label: "Pace", text } };
   }
   return { bar: null, diff: hrFail ? { label: "HR", text: hrFail } : null };
@@ -263,8 +261,9 @@ function repeatSummary(rows, work, reps, word) {
   };
 }
 
-const blockRow = n => ({ kind: "block", n, step: "", dist: "", time: "", pace: "", vs: "", hr: "", status: null });
+const blockRow = n => ({ kind: "block", n, step: "", dist: "", time: "", pace: "", plan: "", vs: "", hr: "", hrMax: "", status: null, attached: false });
 
+// A rest/walk right after a step of the same round is `attached`: drawn as a thin line under that step.
 function repeatTable(rows, single, target) {
   const out = [];
   let lastRep = null;
@@ -273,6 +272,7 @@ function repeatTable(rows, single, target) {
     lastRep = r.rep;
     const work = isWork(r.step);
     const range = rangeOf(r.step);
+    const prev = out.at(-1);
     out.push({
       kind: work ? "work" : "rest",
       n: r.rep,
@@ -280,9 +280,12 @@ function repeatTable(rows, single, target) {
       dist: distText(r.t.distance),
       time: formatClock(r.timed ? r.t.elapsed : r.t.time),
       pace: !r.timed && r.t.pace ? formatPace(r.t.pace) : "",
+      plan: work && range ? paceRange(r.step.pace) : "",
       vs: work && range && r.t.pace != null ? vsText(r.t.pace, range) : "",
       hr: r.t.hr == null ? "" : String(r.t.hr),
+      hrMax: r.t.hrMax == null ? "" : String(r.t.hrMax),
       status: work ? r.verdict.status : null,
+      attached: !work && Boolean(prev) && prev.kind !== "block" && prev.n === r.rep,
     });
   }
   return { columns: single ? "single" : "multi", target: single ? target : null, rows: out };
