@@ -3,7 +3,12 @@
 import { formatClock, formatKm, formatPace } from "./dates.js";
 import { flattenSteps, formatStepAmount, paceRange, stepName } from "./workout.js";
 
+// Timed steps are timed on the clock, so a standing rest counts in full. Laps saved before elapsedTime: moving.
+const elapsedOf = l => l.elapsedTime ?? l.movingTime ?? 0;
+// intervals.icu's tiny extra laps: short in distance and in time (a standing rest is short in distance only).
 const MIN_LAP_M = 20;
+const MIN_LAP_S = 10;
+const isTiny = l => (l.distance || 0) < MIN_LAP_M && elapsedOf(l) < MIN_LAP_S;
 const SHORT_SESSIONS = new Set(["intervals", "racepace"]);
 const NONE = Object.freeze({ status: null, reason: "" });
 
@@ -30,12 +35,14 @@ function paceSpan(paces) {
 function totals(laps) {
   const distance = laps.reduce((s, l) => s + (l.distance || 0), 0);
   const time = laps.reduce((s, l) => s + (l.movingTime || 0), 0);
+  const elapsed = laps.reduce((s, l) => s + elapsedOf(l), 0);
   const withHr = laps.filter(l => l.avgHr > 0 && l.movingTime > 0);
   const hrTime = withHr.reduce((s, l) => s + l.movingTime, 0);
   const hrs = withHr.map(l => Math.round(l.avgHr));
   return {
     distance,
     time,
+    elapsed,
     pace: paceOf(distance, time),
     hr: hrTime ? Math.round(withHr.reduce((s, l) => s + l.avgHr * l.movingTime, 0) / hrTime) : null,
     hrLo: hrs.length ? Math.min(...hrs) : null,
@@ -50,7 +57,7 @@ function hrText(t) {
 }
 
 function doneText(t, timed) {
-  if (timed) return `${formatClock(t.time)} · ${Math.round(t.distance)} m${hrText(t)}`;
+  if (timed) return `${formatClock(t.elapsed)} · ${Math.round(t.distance)} m${hrText(t)}`;
   const pace = t.pace ? ` · ${formatPace(t.pace)} /km` : "";
   const dist = t.distance < 1000 ? `${Math.round(t.distance)} m` : `${formatKm(t.distance, 2)} km`;
   return `${dist} · ${formatClock(t.time)}${pace}${hrText(t)}`;
@@ -61,9 +68,8 @@ function plannedText(step) {
   return [formatStepAmount(step), pace ? `@${pace}` : ""].filter(Boolean).join(" ");
 }
 
-export function lapLines(laps, first = 1) {
-  return (laps ?? []).filter(l => (l.distance || 0) >= MIN_LAP_M)
-    .map((l, i) => `Lap ${first + i}: ${doneText(totals([l]), false)}`);
+function lapLines(laps, first = 1) {
+  return laps.map((l, i) => `Lap ${first + i}: ${doneText(totals([l]), false)}`);
 }
 
 function within(t, range, slack) {
@@ -115,7 +121,7 @@ function take(laps, from, step) {
   if (!target) return null;
   const tol = timed ? 15 : Math.max(100, 0.1 * target);
   const over = timed ? 30 : Math.max(tol, 300);
-  const size = l => (timed ? l.movingTime : l.distance) || 0;
+  const size = l => (timed ? elapsedOf(l) : l.distance || 0);
   let i = from;
   let sum = 0;
   while (i < laps.length && sum < target - tol) sum += size(laps[i++]);
@@ -190,24 +196,25 @@ function group(rows, steps) {
   });
 }
 
+// The rep a repeat is "Not done" from is its first work step without laps; a repeat with only rests left is
+// done. A repeat without work steps (strides) is named from its first step without laps.
 function notDoneNames(rest, steps) {
   const names = [];
-  let lastGroup = null;
+  const named = new Set();
+  const hasWork = g => flattenSteps(steps[g].steps ?? []).some(isWork);
   for (const p of rest) {
-    if (p.group == null) {
-      names.push(stepName(p.step.text));
-      lastGroup = null;
-    } else if (p.group !== lastGroup) {
+    if (p.group == null) names.push(stepName(p.step.text));
+    else if (!named.has(p.group) && (isWork(p.step) || !hasWork(p.group))) {
+      named.add(p.group);
       names.push(`${repeatHeader(steps[p.group]).name} (from rep ${p.rep})`);
-      lastGroup = p.group;
     }
   }
   return names;
 }
 
 export function matchSteps(workout, rawLaps, limits = {}) {
-  if ((rawLaps ?? []).length <= 1) return { kind: "single" };
-  const laps = rawLaps.filter(l => (l.distance || 0) >= MIN_LAP_M);
+  const laps = (rawLaps ?? []).filter(l => !isTiny(l));
+  if (laps.length <= 1) return { kind: "single" };
   const plan = expand(workout?.steps);
   if (!plan.length) return { kind: "laps", lines: lapLines(laps) };
   const rows = [];

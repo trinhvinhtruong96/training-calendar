@@ -59,8 +59,9 @@ The Performance card loses its "Each run" button and list; everything else on it
 
 ## 3. Data
 
-- **Saved laps:** a new storage key `tc.v1.laps` holds `{ [activityId]: [{distance, movingTime, avgHr}] }`
-  (the same reduced lap shape as the Performance card). Written only for non-empty replies. On every write it
+- **Saved laps:** a new storage key `tc.v1.laps` holds `{ [activityId]: [{distance, movingTime, elapsedTime,
+  avgHr}] }` (the Performance card's reduced lap shape plus `elapsedTime`; laps saved without it are fetched
+  again). Written only for non-empty replies. On every write it
   is pruned to activity ids present in the current cached `activities`. `store.forget()` removes it.
 - **Where the details get laps**, in order: `tc.v1.laps` → `data.performance.laps` → `GET
   /activity/{id}/intervals` (reduced with the existing `reduceLaps`).
@@ -79,22 +80,26 @@ Input: the workout's steps (as cached: `text`, `distance`, `duration`, `pace {st
 `steps`), the run's laps, and limits `{ lt, easyLimit }` from the Performance card (both null when unknown).
 
 1. Expand the steps in order; a repeat becomes its steps × reps, remembering group and rep number.
-2. Ignore laps shorter than 20 m (intervals.icu's tiny extra laps).
+2. Ignore intervals.icu's tiny extra laps: shorter than 20 m **and** under 10 s (a standing rest is short in
+   distance only, so it stays).
 3. For each expanded step, take consecutive laps:
    - **Distance step** (`distance > 0`): add laps until covered ≥ distance − tol, `tol = max(100 m, 10 %)`;
      then keep adding the next lap while that brings the total closer to the planned distance (so a 12 km step
      takes all twelve 1 km auto-laps, not eleven).
-   - **Timed step** (no distance, `duration > 0`): add laps until time ≥ duration − 15 s; then the same
-     "closer to the plan" rule on time.
+   - **Timed step** (no distance, `duration > 0`): add laps until elapsed time ≥ duration − 15 s; then the same
+     "closer to the plan" rule on elapsed time (a standing rest counts in full).
    - **Mismatch** — stop matching at this step — if the step's laps exceed the plan by more than
      `max(tol, 300 m)` (distance) or 30 s (time), or if laps run out before the step is covered. Steps from
      here on are "Not done" if no laps are left, otherwise the remaining laps become plain lines under "Steps
      after this didn't match your laps".
 4. Laps left after the last step: "After the workout".
-5. A step's numbers: distance = sum, time = sum of moving time, pace = time ÷ km, HR = time-weighted mean of
-   the laps that have HR; the HR range (min–max of lap averages) is shown when the step has 2+ laps.
+5. A step's numbers: distance = sum, time = sum of moving time (elapsed time for a timed step), pace = moving
+   time ÷ km, HR = time-weighted mean of the laps that have HR; the HR range (min–max of lap averages) is shown
+   when the step has 2+ laps.
 
-Workout with no steps: plain laps. Run with one lap or no laps: "No laps from your watch" and no rows.
+Workout with no steps (or an extra run): plain laps. Run with one lap or no laps (after dropping tiny laps):
+"No laps from your watch" and no rows. "Not done" names a repeat from its first rep without laps; a repeat
+with only rests left is done.
 
 ## 5. Step verdicts
 

@@ -219,16 +219,20 @@ export function reduceLaps(reply) {
   return (reply?.icu_intervals ?? []).map(l => ({
     distance: l.distance ?? 0,
     movingTime: l.moving_time ?? 0,
+    elapsedTime: l.elapsed_time ?? l.moving_time ?? 0,
     avgHr: l.average_heartrate ?? null,
   }));
 }
+
+// Usable saved laps: non-empty and in the current shape (laps saved before elapsedTime are fetched again).
+const lapsOk = laps => Array.isArray(laps) && laps.length > 0 && laps[0].elapsedTime !== undefined;
 
 // Saved laps are kept only for runs the page knows about (the cached activities), never empty.
 export function mergeLaps(store, add, knownIds) {
   const known = new Set((knownIds ?? []).map(String));
   const next = {};
   for (const [id, laps] of Object.entries({ ...store.getLaps(), ...add })) {
-    if (known.has(id) && Array.isArray(laps) && laps.length) next[id] = laps;
+    if (known.has(id) && lapsOk(laps)) next[id] = laps;
   }
   store.setLaps(next);
 }
@@ -236,8 +240,8 @@ export function mergeLaps(store, add, knownIds) {
 // Laps of one run for the day details: saved → the Performance card's → intervals.icu. Never logs out.
 export async function loadDayLaps(activityId, { store, knownIds, extra = {}, fetchImpl = defaultFetch }) {
   const id = String(activityId);
-  const saved = store.getLaps()[id] ?? extra?.[id];
-  if (saved?.length) return { laps: saved };
+  const saved = [store.getLaps()[id], extra?.[id]].find(lapsOk);
+  if (saved) return { laps: saved };
   const auth = store.getAuth();
   if (!auth) return { error: true };
   const res = await softRequest(`/activity/${encodeURIComponent(id)}/intervals`, auth, fetchImpl);
@@ -286,8 +290,8 @@ async function loadPerformance({ extras, activities, prev, auth, store, fetchImp
   const alive = () => store.getAuth()?.secret === auth.secret; // Forget / Log out / new key: stop
   const laps = {};
   await Promise.all(runs.map(async a => {
-    const known = oldLaps[a.id]?.length ? oldLaps[a.id] : saved[a.id];
-    if (known?.length) {
+    const known = [oldLaps[a.id], saved[a.id]].find(lapsOk);
+    if (known) {
       laps[a.id] = known;
       return;
     }

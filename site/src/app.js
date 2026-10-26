@@ -8,7 +8,7 @@ import {
 import { GROUP, TYPE_LABEL, formatStepAmount, noteText, paceRange, shortName, stepLevel, stepName, workoutBar } from "./workout.js";
 import { buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, resultText, runSummary, statusInfo } from "./model.js";
 import { buildPerformance } from "./performance.js";
-import { lapLines, matchSteps } from "./steps.js";
+import { matchSteps } from "./steps.js";
 
 let storage = null;
 try {
@@ -352,8 +352,8 @@ function stepsContent(res, run, workout, body, title) {
       }, "Try again")];
   }
   if (res.notReady) return [stepsNote("Laps aren't ready yet in intervals.icu.")];
-  const m = workout ? matchSteps(workout, res.laps, state.performance?.limits ?? {}) : { kind: "laps", lines: lapLines(res.laps) };
-  if (m.kind === "single" || (m.kind === "laps" && !m.lines.length)) return [stepsNote("No laps from your watch.")];
+  const m = matchSteps(workout, res.laps, state.performance?.limits ?? {}); // no workout (extra run): plain laps
+  if (m.kind === "single") return [stepsNote("No laps from your watch.")];
   const lines = items => h("ul", { class: "perf-list steps-list" }, items.map(t => perfItem("none", h("span", { text: t }))));
   if (m.kind === "laps") return [lines(m.lines)];
   const list = h("ul", { class: "perf-list steps-list" });
