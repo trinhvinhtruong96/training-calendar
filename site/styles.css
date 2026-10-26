@@ -713,10 +713,46 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 /* ---------- run steps (day details) ---------- */
 .steps-result { margin-top: 14px; }
 .steps-title { margin: 0 0 8px; font-size: 0.95rem; }
-.step-done { display: block; font-size: 0.9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.steps-reps { padding-left: 28px; }
-.steps-reps[hidden] { display: none; }
 .steps-result .btn.small { margin-top: 6px; }
+.steps-legend { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font-size: 0.8rem; color: var(--muted); }
+.legend-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fg); }
+.legend-band { width: 18px; height: 7px; margin-left: 6px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.step-list { list-style: none; margin: 0; padding: 0; }
+.step-row { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; padding: 10px 0; border-top: 1px solid var(--border); }
+.step-row:first-child { border-top: 0; }
+.step-row.s-ok > .perf-icon { color: var(--ok); }
+.step-row.s-check > .perf-icon { color: var(--danger); }
+.step-body > p { margin: 0; }
+.step-body > .step-name { margin-bottom: 2px; }
+.step-kv { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.step-k { color: var(--muted); font-size: 0.8rem; line-height: 1.6; }
+.kv-part { display: inline-block; max-width: 100%; }
+.reps-target { margin: 0 0 4px; }
+.step-bar { position: relative; height: 12px; margin: 8px 6px 2px; forced-color-adjust: none; }
+.step-bar::before { content: ""; position: absolute; inset: 2px 0 auto; height: 8px; border-radius: 4px; background: var(--border); }
+.bar-band { position: absolute; top: 2px; height: 8px; left: var(--lo); width: calc(var(--hi) - var(--lo)); border-radius: 4px; background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.bar-limit { position: absolute; top: -2px; left: calc(var(--hi) - 1px); width: 2px; height: 16px; background: var(--accent); }
+.bar-dot { position: absolute; top: 0; left: var(--at); width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--muted); }
+.bar-dot.s-ok { background: var(--ok); }
+.bar-dot.s-check { background: var(--danger); }
+.strip .bar-dot { top: 1.5px; width: 9px; height: 9px; margin-left: -4.5px; opacity: 0.8; }
+.bar-dot.off-low, .bar-dot.off-high { width: 10px; height: 12px; top: 0; border-radius: 0; opacity: 1; }
+.bar-dot.off-low { margin-left: -10px; clip-path: polygon(0 50%, 100% 0, 100% 100%); }
+.bar-dot.off-high { margin-left: 0; clip-path: polygon(0 0, 100% 50%, 0 100%); }
+.step-diff { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: var(--muted); }
+.step-row.s-ok .step-diff-text { color: var(--ok); }
+.step-row.s-check .step-diff-text { color: var(--danger); font-weight: 700; }
+.step-body .btn.small { margin-top: 8px; }
+.reps-wrap { margin-top: 8px; }
+.reps-wrap[hidden] { display: none; }
+.reps-scroll { overflow-x: auto; }
+.reps-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.reps-table th { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); text-align: left; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.reps-table td { padding: 4px 8px 4px 0; white-space: nowrap; }
+.reps-table .rt-rest td { padding-top: 0; font-size: 0.8rem; color: var(--muted); }
+.reps-table .rt-block th { padding-top: 8px; border-bottom: 0; }
+.reps-table tr.s-check .rt-vs, .reps-table tr.s-check .rt-status { color: var(--danger); font-weight: 700; }
+.reps-table tr.s-ok .rt-status { color: var(--ok); font-weight: 700; }
 
 @media (max-width: 719px) {
   .grid-wrap { display: none; }
@@ -773,5 +809,9 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 @media (forced-colors: active) {
   .cell, .week-row, .chip, .preview, .status-btn { border: 1px solid CanvasText; }
   .cell.is-today, .week-row.is-today { outline: 3px solid Highlight; outline-offset: 1px; }
-  .bar rect, .type-bar, .step-dot, .swatch, .meter span, .mini-meter span, .progress span { forced-color-adjust: none; }
+  .bar rect, .type-bar, .step-dot, .swatch, .meter span, .mini-meter span, .progress span, .legend-dot, .legend-band { forced-color-adjust: none; }
+  /* Step bars: system colours, so they show on any high-contrast canvas; the text carries ✓ / ! */
+  .step-bar::before { background: Canvas; border: 1px solid CanvasText; }
+  .bar-band, .legend-band { background: Highlight; }
+  .bar-dot, .bar-dot.s-ok, .bar-dot.s-check, .bar-limit, .legend-dot { background: CanvasText; }
 }

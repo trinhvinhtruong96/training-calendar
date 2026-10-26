@@ -312,7 +312,7 @@ function renderRun(a, label) {
 
 // ---------- run steps (day details) ----------
 // Filled after the laps load; a late result is dropped if another day is open by then. The details are rebuilt
-// on every render, so open "Show reps" lists (state.openReps) and the focused control (state.detailsFocus) are
+// on every render, so open repeat tables (state.openReps) and the focused control (state.detailsFocus) are
 // kept in state. Control keys: steps:<runId>:title | :retry | :reps:<i>.
 const byKeyIn = (root, key) => root.querySelector(`[data-key="${CSS.escape(key)}"]`);
 const stepsNote = text => h("p", { class: "muted small", text });
@@ -356,34 +356,97 @@ function stepsContent(res, run, workout, body, title) {
   if (m.kind === "single") return [stepsNote("No laps from your watch.")];
   const lines = items => h("ul", { class: "perf-list steps-list" }, items.map(t => perfItem("none", h("span", { text: t }))));
   if (m.kind === "laps") return [lines(m.lines)];
-  const list = h("ul", { class: "perf-list steps-list" });
-  m.items.forEach((it, i) => {
-    if (it.kind === "step") {
-      list.append(stepRow(it));
-      return;
-    }
-    const id = `reps-${run.id}-${i}`;
-    const open = state.openReps.has(id);
-    list.append(
-      stepRow(it, h("button", {
-        type: "button", class: "btn ghost small", "aria-expanded": String(open), "aria-controls": id,
-        "data-key": `steps:${run.id}:reps:${i}`, onclick: e => toggleReps(e.currentTarget, id),
-      }, open ? "Hide reps" : "Show reps")),
-      h("li", { class: "steps-reps", id, hidden: !open }, h("ul", { class: "perf-list" }, it.rows.map(r => stepRow(r)))));
-  });
-  if (m.after) list.append(perfItem("none", h("strong", { text: "After the workout" }), h("span", { class: "step-done", text: m.after })));
-  const out = [list];
+  const list = h("ul", { class: "step-list" },
+    m.items.map((it, i) => (it.kind === "repeat" ? repeatRow(it, run, i) : stepRow(it))),
+    m.after ? stepRow({ name: "After the workout", status: null, expected: "", actual: m.after, bar: null, diff: null }) : "");
+  const out = [m.items.some(it => it.bar) ? stepsLegend() : "", list];
   if (m.notDone.length) out.push(stepsNote(`Not done: ${m.notDone.join(", ")}`));
   if (m.unmatched.length) out.push(stepsNote("Steps after this didn't match your laps:"), lines(m.unmatched));
   return out;
 }
 
-function stepRow(r, extra = "") {
-  return perfItem(r.status ?? "none",
-    h("strong", { text: r.name }),
-    r.planned ? h("span", { class: "muted", text: ` · ${r.planned}` }) : "",
-    h("span", { class: "step-done", text: [r.done, r.reason].filter(Boolean).join(" · ") }),
-    extra);
+// One step: name with status, Expected and Actual lines, bar, difference line (display spec §3).
+function stepRow(it, ...extra) {
+  const key = it.status ?? "none";
+  const s = PERF_STATUS[key];
+  return h("li", { class: `step-row s-${key}` },
+    h("span", { class: "perf-icon", "aria-hidden": "true", text: s.icon }),
+    h("div", { class: "step-body" },
+      h("p", { class: "step-name" }, s.label ? h("span", { class: "sr-only", text: `${s.label}: ` }) : "", h("strong", { text: it.name })),
+      it.expected ? kv("Expected", it.expected) : "",
+      kv("Actual", it.actual),
+      it.bar ? stepBar(it.bar) : "",
+      it.diff ? h("p", { class: "step-diff" }, h("span", { text: it.diff.label }), h("span", { class: "step-diff-text", text: it.diff.text })) : "",
+      ...extra));
+}
+
+// Lines break between the " · " parts, so a part like "HR 143 (136–156)" stays whole; a part longer than the
+// line still wraps inside itself.
+const kv = (label, value) => h("p", { class: "step-kv" }, h("span", { class: "step-k", text: label }),
+  h("span", {}, value.split(" · ").map((part, i) => [i ? " · " : "", h("span", { class: "kv-part", text: part })])));
+
+const stepsLegend = () => h("p", { class: "steps-legend", "aria-hidden": "true" },
+  h("span", { class: "legend-dot" }), "you", h("span", { class: "legend-band" }), "plan · left = faster / lower");
+
+// Band = plan, dot = you; positions in % from steps.js. Hidden from screen readers: the text says the same.
+function stepBar(bar) {
+  const mark = (p, status) => h("span", {
+    class: `bar-dot s-${status ?? "none"}${p.off ? ` off-${p.off}` : ""}`,
+    style: { "--at": `${p.at}%` },
+  });
+  return h("div", {
+    class: `step-bar${bar.dots ? " strip" : ""}`,
+    "aria-hidden": "true",
+    style: { "--lo": `${bar.lo}%`, "--hi": `${bar.hi}%` },
+  },
+  h("span", { class: "bar-band" }),
+  bar.kind === "hr" ? h("span", { class: "bar-limit" }) : "",
+  bar.dots ? bar.dots.map(d => mark(d, d.status)) : mark(bar, bar.status));
+}
+
+function repeatRow(it, run, i) {
+  const id = `reps-${run.id}-${i}`;
+  const open = state.openReps.has(id);
+  return stepRow(it,
+    h("button", {
+      type: "button", class: "btn ghost small", "aria-expanded": String(open), "aria-controls": id,
+      "data-key": `steps:${run.id}:reps:${i}`, "data-noun": it.label, onclick: e => toggleReps(e.currentTarget, id),
+    }, `${open ? "Hide" : "Show"} ${it.label}`),
+    h("div", { class: "reps-wrap", id, hidden: !open }, repsTable(it)));
+}
+
+// Compact table of a repeat (display spec §5): one work step → # Time Pace vs-plan HR, rests as thin rows;
+// otherwise Step Dist Time Pace vs-plan HR with a "Block n" row per round.
+function repsTable(it) {
+  const t = it.table;
+  const single = t.columns === "single";
+  const heads = single ? ["#", "Time", "Pace", "vs plan", "HR"] : ["Step", "Dist", "Time", "Pace", "vs plan", "HR"];
+  const span = heads.length + 1;
+  const statusCell = status => {
+    const s = PERF_STATUS[status ?? "none"];
+    return h("td", { class: "rt-status" }, h("span", { "aria-hidden": "true", text: s.icon }), s.label ? h("span", { class: "sr-only", text: s.label }) : "");
+  };
+  const rows = t.rows.map(r => {
+    if (r.kind === "block") return h("tr", { class: "rt-block" }, h("th", { scope: "colgroup", colspan: span, text: `Block ${r.n}` }));
+    if (single && r.kind === "rest") {
+      return h("tr", { class: "rt-rest" }, h("td", { colspan: span, text: `${r.step.toLowerCase()} ${r.time} · ${r.dist}${r.hr ? ` · HR ${r.hr}` : ""}` }));
+    }
+    const cells = single ? [String(r.n), r.time, r.pace, r.vs, r.hr] : [r.step, r.dist, r.time, r.pace, r.vs, r.hr];
+    const vsAt = cells.length - 2;
+    return h("tr", { class: `${r.kind === "rest" ? "rt-rest " : ""}s-${r.status ?? "none"}` },
+      cells.map((c, k) => h("td", { class: k === vsAt ? "rt-vs" : null, text: c })),
+      statusCell(r.status));
+  });
+  return [
+    t.target ? h("p", { class: "reps-target muted small", text: t.target }) : "",
+    h("div", { class: "reps-scroll" },
+      h("table", { class: "reps-table" },
+        h("caption", { class: "sr-only", text: `${it.label === "blocks" ? "Blocks" : "Reps"} of ${it.name}` }),
+        h("thead", {}, h("tr", {},
+          heads.map(x => h("th", { scope: "col", text: x })),
+          h("th", { scope: "col" }, h("span", { class: "sr-only", text: "Status" })))),
+        h("tbody", {}, rows))),
+  ];
 }
 
 function toggleReps(btn, id) {
@@ -391,7 +454,7 @@ function toggleReps(btn, id) {
   if (open) state.openReps.add(id);
   else state.openReps.delete(id);
   btn.setAttribute("aria-expanded", String(open));
-  btn.textContent = open ? "Hide reps" : "Show reps";
+  btn.textContent = `${open ? "Hide" : "Show"} ${btn.dataset.noun}`;
   document.getElementById(id).hidden = !open;
 }
 
