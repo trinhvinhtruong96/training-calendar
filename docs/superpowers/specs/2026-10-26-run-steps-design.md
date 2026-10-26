@@ -102,11 +102,11 @@ Same tolerances as the Performance card. `cue` = the step text, lower-cased.
 
 | Step cue | ✓ when | ! reason |
 |---|---|---|
-| warmup, easy, cooldown, walk | HR ≤ easyLimit + 3 | "HR above {easyLimit}" |
+| warmup, easy, cooldown | HR ≤ easyLimit + 3 | "HR above {easyLimit}" |
 | rep; race pace in a workout of type intervals/racepace | pace within [fast − 2 s, slow + 2 s] | "too fast" / "too slow" |
 | threshold, settle, tempo | pace ≥ fast − 5 s and HR ≤ lt + 2 | "too fast" / "HR above {lt}"; slower than slow + 5 s → note "slower than planned", no ! |
 | steady; race pace in a long or key run | pace within [fast − 3 s, slow + 3 s] | "too fast" / "too slow" |
-| stride, rest, race, test all out, anything else | no verdict | — |
+| stride, walk, rest, race, test all out, anything else | no verdict (a walk after a stride still has a high HR) | — |
 
 - Checks that need HR are skipped when the step has no HR or the limit is null; a step with nothing to check
   shows no status.
