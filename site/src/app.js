@@ -804,7 +804,7 @@ function renderSetup(message = "", about = "key") {
   const form = h("form", { class: "setup-form", novalidate: true },
     h("label", { for: "key", text: "intervals.icu API key" }),
     h("div", { class: "key-row" }, input, toggle),
-    h("p", { id: "key-help", class: "muted small", text: "Saved only in this browser. This page only reads your calendar and runs." }),
+    h("p", { id: "key-help", class: "muted small", text: "Saved only in this browser. This page only reads your calendar, runs, wellness and settings." }),
     error,
     submit);
   form.addEventListener("submit", async e => {
@@ -859,7 +859,7 @@ function renderSetup(message = "", about = "key") {
     login = [
       h("div", { class: "setup-form" },
         loginBtn,
-        h("p", { id: "login-help", class: "muted small", text: "Opens intervals.icu. The page asks only to read your planned workouts and runs." }),
+        h("p", { id: "login-help", class: "muted small", text: "Opens intervals.icu. The page asks only to read your planned workouts and runs, plus wellness and settings for the Performance card." }),
         loginError),
       keyOption,
     ];

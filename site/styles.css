@@ -692,7 +692,7 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 .perf-label { margin: 0; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
 .perf-value { margin: 4px 0 6px; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .perf-meta { margin: 2px 0 0; font-size: 0.85rem; color: var(--muted); }
-.perf-meta.k-good { color: var(--ok); font-weight: 600; }
+.perf-meta.k-good { color: color-mix(in srgb, var(--ok) 80%, var(--fg)); font-weight: 600; } /* --ok alone is 4.43:1 on --surface-2 */
 .perf-meta.k-note { color: var(--fg); font-weight: 600; }
 .perf-note {
   margin: 12px 0 0;

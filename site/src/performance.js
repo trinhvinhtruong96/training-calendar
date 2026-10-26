@@ -10,6 +10,7 @@ export const CURVE_DAYS = 90;
 export const MIN_RUN_M = 2000;
 
 const HM_M = 21097.5;
+const COULD_NOT_LOAD = "Couldn't load yet. It updates with the next refresh.";
 
 export const windowFrom = today => addDays(today, -(WINDOW_DAYS - 1));
 export const curveWindow = end => `r.${addDays(end, -(CURVE_DAYS - 1))}.${end}`;
@@ -76,11 +77,11 @@ function racePaceOf(events, today) {
 
 // hardEffort: the HR curve shows a hard effort (or the athlete records no HR, so it can't tell). Without one, a
 // critical-speed model fitted to easy runs only would give a meaningless "threshold" (spec §1: Baobao001).
-function paceTile(perf, events, today, plan, hardEffort) {
+function paceTile(perf, events, today, plan, hardEffort, hrMissing) {
   const now = hardEffort ? thresholdPace(perf.paceNow) : null;
   const tile = { label: "Threshold pace", value: now ? `${formatPace(now)} /km` : null, lines: [] };
   if (!now) {
-    tile.lines.push({ kind: "muted", text: "Not enough hard running yet: a test or race sets it." });
+    tile.lines.push({ kind: "muted", text: hrMissing ? COULD_NOT_LOAD : "Not enough hard running yet: a test or race sets it." });
     return { tile, pace: null };
   }
   const start = thresholdPace(perf.pacePlanStart);
@@ -107,7 +108,7 @@ function hrTile(perf, today, plan) {
   const lt = thresholdHr(perf.hrNow, perf.settings);
   const tile = { label: "Threshold heart rate", value: lt ? `${lt.bpm} bpm` : null, lines: [] };
   if (!lt) {
-    tile.lines.push({ kind: "muted", text: "Not enough hard running yet: a test or race of 30+ min sets it." });
+    tile.lines.push({ kind: "muted", text: perf.hrNow == null ? COULD_NOT_LOAD : "Not enough hard running yet: a test or race of 30+ min sets it." });
     return { tile, lt: null };
   }
   const start = thresholdHr(perf.hrPlanStart, perf.settings);
@@ -258,13 +259,14 @@ function judgeEasy(laps, t, ctx, type) {
   const issues = [];
   const limit = ctx.easyLimit;
   const inPart = l => t.work.some(s => inStep(l, s));
-  if (limit) {
+  if (limit && type !== "key") { // spec §5.1: a key run is judged on its race-pace part only
     const over = laps.filter(l => l.start >= 900 && l.distance >= 200 && l.avgHr > limit + 3 && !inPart(l));
     if (over.length) {
       const hrs = over.map(l => Math.round(l.avgHr));
       const km = Math.floor(over[0].start / 1000) + 1;
       problems.push(`HR ${span(hrs)} from km ${km}, limit ${limit}`);
-      issues.push({ kind: "easyHr", hr: Math.max(...hrs), km });
+      const top = over.reduce((a, b) => (b.avgHr > a.avgHr ? b : a)); // the suggestion names the highest lap
+      issues.push({ kind: "easyHr", hr: Math.round(top.avgHr), km: Math.floor(top.start / 1000) + 1 });
     }
   }
   if (t.work.length) {
@@ -374,7 +376,10 @@ export function buildPerformance(data, today, plan = PLAN) {
   out.loaded = true;
 
   const hrInfo = hrTile(perf, today, plan);
-  const paceInfo = paceTile(perf, data.events ?? [], today, plan, Boolean(hrInfo.lt) || !(perf.hrNow?.h1 > 0));
+  // HR curve missing (request failed, nothing saved): we can't tell whether the pace model came from hard efforts.
+  const hrMissing = perf.hrNow == null;
+  const hardEffort = !hrMissing && (Boolean(hrInfo.lt) || !(perf.hrNow.h1 > 0));
+  const paceInfo = paceTile(perf, data.events ?? [], today, plan, hardEffort, hrMissing);
   out.pace = paceInfo.tile;
   out.hr = hrInfo.tile;
   out.settingsNote = settingsNote(perf.settings, hrInfo.lt, paceInfo.pace);
