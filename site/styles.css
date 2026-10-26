@@ -724,7 +724,7 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 .step-row.s-check > .perf-icon { color: var(--danger); }
 .step-body > p { margin: 0; }
 .step-body > .step-name { margin-bottom: 2px; }
-.step-kv { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.step-kv { display: grid; grid-template-columns: 4rem minmax(0, 1fr); gap: 6px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .step-k { color: var(--muted); font-size: 0.8rem; line-height: 1.6; }
 .kv-part { display: inline-block; max-width: 100%; }
 .reps-target { margin: 0 0 4px; }
@@ -745,7 +745,7 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 .step-body .btn.small { margin-top: 8px; }
 .reps-wrap { margin-top: 8px; }
 .reps-wrap[hidden] { display: none; }
-.reps-scroll { overflow-x: auto; }
+.reps-scroll { position: relative; overflow-x: auto; } /* relative: keeps the status cells' .sr-only labels inside the scroll box */
 .reps-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .reps-table th { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); text-align: left; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 .reps-table td { padding: 4px 8px 4px 0; white-space: nowrap; }

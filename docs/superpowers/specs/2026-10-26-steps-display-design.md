@@ -112,7 +112,7 @@ several. `aria-expanded`, `aria-controls`; open state and focus survive a refres
   **Time**, **Pace**, **vs plan**, **HR**, status. Each rest is a muted row spanning the columns under its
   rep: "rest 1:30 · 100 m · HR 149".
 - **Several work steps or none:** columns **Step**, **Dist**, **Time**, **Pace**, **vs plan**, **HR**,
-  status; a "Block n" heading row (spanning, `th scope="colgroup"`) before each round. Rest/walk/stride rows
+  status; each round is its own `<tbody>` headed by a "Block n" row (spanning, `th scope="rowgroup"`). Rest/walk/stride rows
   are muted and have no "vs plan" and no status.
 - **vs plan:** "n s fast" / "n s slow" from the nearer end of the work step's range, or "in range".
 - HR = time-weighted average of the row's laps. Status cell: icon with a spoken label.

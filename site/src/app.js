@@ -416,7 +416,7 @@ function repeatRow(it, run, i) {
 }
 
 // Compact table of a repeat (display spec §5): one work step → # Time Pace vs-plan HR, rests as thin rows;
-// otherwise Step Dist Time Pace vs-plan HR with a "Block n" row per round.
+// otherwise Step Dist Time Pace vs-plan HR, each round in its own tbody headed "Block n" (scope rowgroup).
 function repsTable(it) {
   const t = it.table;
   const single = t.columns === "single";
@@ -426,8 +426,7 @@ function repsTable(it) {
     const s = PERF_STATUS[status ?? "none"];
     return h("td", { class: "rt-status" }, h("span", { "aria-hidden": "true", text: s.icon }), s.label ? h("span", { class: "sr-only", text: s.label }) : "");
   };
-  const rows = t.rows.map(r => {
-    if (r.kind === "block") return h("tr", { class: "rt-block" }, h("th", { scope: "colgroup", colspan: span, text: `Block ${r.n}` }));
+  const row = r => {
     if (single && r.kind === "rest") {
       return h("tr", { class: "rt-rest" }, h("td", { colspan: span, text: `${r.step.toLowerCase()} ${r.time} · ${r.dist}${r.hr ? ` · HR ${r.hr}` : ""}` }));
     }
@@ -436,7 +435,16 @@ function repsTable(it) {
     return h("tr", { class: `${r.kind === "rest" ? "rt-rest " : ""}s-${r.status ?? "none"}` },
       cells.map((c, k) => h("td", { class: k === vsAt ? "rt-vs" : null, text: c })),
       statusCell(r.status));
-  });
+  };
+  const bodies = [];
+  for (const r of t.rows) {
+    if (r.kind === "block") {
+      bodies.push([h("tr", { class: "rt-block" }, h("th", { scope: "rowgroup", colspan: span, text: `Block ${r.n}` }))]);
+    } else {
+      if (!bodies.length) bodies.push([]);
+      bodies.at(-1).push(row(r));
+    }
+  }
   return [
     t.target ? h("p", { class: "reps-target muted small", text: t.target }) : "",
     h("div", { class: "reps-scroll" },
@@ -445,7 +453,7 @@ function repsTable(it) {
         h("thead", {}, h("tr", {},
           heads.map(x => h("th", { scope: "col", text: x })),
           h("th", { scope: "col" }, h("span", { class: "sr-only", text: "Status" })))),
-        h("tbody", {}, rows))),
+        bodies.map(rows => h("tbody", {}, rows)))),
   ];
 }
 
