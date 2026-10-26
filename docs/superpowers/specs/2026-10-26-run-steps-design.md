@@ -12,13 +12,13 @@ with ✓ / ! against the plan's targets.
 **Success:** opening Truong's days from week 1 shows:
 
 - **Wed 21 Oct (10×400):** Warm-up 1.61 km ✓ (HR about 143); a repeat line "10 × 400 m · reps 3:25–3:56 ·
-  10 faster than 4:02 !" that opens to each rep and rest; "After the workout" ≈ 1.39 km.
-- **Fri 23 Oct (threshold, first plan version):** Warm-up ✓, then 2 × (Settle 1 km, Threshold 2 km, Rest 3 min):
-  both Settle rows ! too fast (4:18 vs 4:30–4:40), the first Threshold row ! (too fast, HR above 180);
-  "After the workout" ≈ 2.1 km.
+  10 too fast !" that opens to each rep and rest; "After the workout" ≈ 1.39 km.
+- **Fri 23 Oct (threshold, first plan version):** Warm-up ✓, then 2 × (Settle 1 km, Threshold 2 km, Rest 3 min)
+  summarised "blocks 4:10–4:18 · 4 too fast !": both Settle rows too fast (4:18 vs 4:30–4:40), both Threshold
+  rows too fast (4:12, 4:10), HR 182 within lt + 2; "After the workout" 2.08 km.
 - **Sat 24 Oct (easy 7 km + strides):** Easy 7 km ✓ (HR 132–150), 4 strides and walks, no verdict.
-- **Sun 25 Oct (long 12 km):** one Easy 12 km step (12.0 km, 12 laps) with HR above 150 marked !; "After the
-  workout" 0.13 km.
+- **Sun 25 Oct (long 12 km):** one Easy 12 km step (12 km, 12 laps) with HR above 150 marked !; "After the
+  workout" 127 m.
 - **Sat 17 Oct (run before the plan):** not a plan day, so no details. **Sun 18 Oct** likewise. (Details exist
   only for plan days, as today.)
 
@@ -40,7 +40,7 @@ For each planned workout with a run, under the existing "Your run" box, a **Step
   pace, HR), and **status** (✓, ! with a short reason, or none). Status is never colour alone: the icon has a
   text label for screen readers.
 - A planned repeat is **one summary row**: "10 × 400 m · @4:02–4:08 · 90 s rest" planned; done "reps 3:25–3:56 ·
-  10 faster" (or "all on target"); status ! if any rep has !. A **Show reps** button (`aria-expanded`,
+  10 too fast" (or "all on target"); status ! if any rep has !. A **Show reps** button (`aria-expanded`,
   keyboard operable) opens the rep and rest rows (Rep 1, Rest, Rep 2, …).
 - **After the workout**: one row with the laps after the last planned step (distance, time, pace, HR), only
   when there are any.
