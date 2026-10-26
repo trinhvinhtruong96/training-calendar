@@ -7,6 +7,7 @@ import {
 } from "./dates.js";
 import { GROUP, TYPE_LABEL, formatStepAmount, noteText, paceRange, shortName, stepLevel, stepName, workoutBar } from "./workout.js";
 import { buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, resultText, runSummary, statusInfo } from "./model.js";
+import { buildPerformance } from "./performance.js";
 
 let storage = null;
 try {
@@ -34,6 +35,8 @@ const state = {
   opener: null,
   session: 0, // bumped on Forget / new key so late refresh results are dropped
   openWeeks: null, // week numbers expanded in the phone plan list
+  performance: null, // Performance card data (buildPerformance)
+  perfRunsOpen: false, // "Each run" list expanded
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -99,6 +102,7 @@ const byKey = key => app.querySelector(`[data-key="${CSS.escape(key)}"]`);
 function rebuild() {
   state.today = localToday();
   state.model = buildModel(state.data, state.today, PLAN);
+  state.performance = buildPerformance(state.data, state.today, PLAN);
   if (state.viewWeek == null) state.viewWeek = currentWeek();
   if (!state.openWeeks) state.openWeeks = new Set([currentWeek()]);
   if (!state.focusDate || !state.model.byDate.has(state.focusDate)) {
@@ -112,7 +116,7 @@ function render() {
   const activeKey = active && app.contains(active) ? active.dataset.key : null;
   app.replaceChildren(
     renderHeader(),
-    h("main", { id: "main", class: "layout" }, renderToday(), renderWeek(), renderPlan()),
+    h("main", { id: "main", class: "layout" }, renderToday(), renderWeek(), renderPerformance(), renderPlan()),
     h("button", { type: "button", class: "fab", "data-key": "btn:fab", onclick: goToToday }, "Today"),
   );
   app.removeAttribute("aria-busy");
@@ -403,6 +407,71 @@ function bindSwipe(el, onSwipe) {
     e.preventDefault();
     e.stopPropagation();
   }, true);
+}
+
+// ---------- performance ----------
+const PERF_STATUS = {
+  ok: { icon: "✓", label: "On target" },
+  check: { icon: "!", label: "Check" },
+  neutral: { icon: "–", label: "No verdict" },
+  skip: { icon: "·", label: "Not judged" },
+};
+
+function renderPerformance() {
+  const p = state.performance;
+  const section = h("section", { class: "card perf", "aria-labelledby": "perf-title" },
+    h("div", { class: "section-head" }, h("h2", { id: "perf-title", text: "Performance" })));
+  if (!p?.loaded) {
+    section.append(h("p", { class: "muted", text: "Performance couldn't load yet. It updates with the next refresh." }));
+    return section;
+  }
+  section.append(
+    h("div", { class: "perf-tiles" }, perfTile(p.pace), perfTile(p.hr)),
+    p.settingsNote ? h("p", { class: "perf-note", text: p.settingsNote }) : "",
+    h("h3", { class: "perf-sub", text: `Last 10 days · ${formatShortRange(p.from, p.to)}` }),
+    h("ul", { class: "perf-list" }, p.lines.map(l => perfItem(l.status, h("span", { text: l.text })))),
+    h("h3", { class: "perf-sub", text: "Suggestions" }),
+    h("ol", { class: "perf-suggest" }, p.suggestions.map(s => h("li", { text: s }))),
+    perfRuns(p.runs));
+  return section;
+}
+
+function perfTile(t) {
+  return h("div", { class: "perf-tile" },
+    h("p", { class: "perf-label", text: t.label }),
+    h("p", { class: "perf-value", text: t.value ?? "–" }),
+    t.lines.map(line => h("p", { class: `perf-meta k-${line.kind}`, text: line.text })));
+}
+
+// Status is never colour alone: a visible icon plus a spoken label.
+function perfItem(status, ...content) {
+  const s = PERF_STATUS[status] ?? PERF_STATUS.neutral;
+  return h("li", { class: `perf-item s-${status}` },
+    h("span", { class: "perf-icon", "aria-hidden": "true", text: s.icon }),
+    h("span", {}, h("span", { class: "sr-only", text: `${s.label}: ` }), ...content));
+}
+
+function perfRuns(runs) {
+  if (!runs.length) return "";
+  const open = state.perfRunsOpen;
+  return h("div", { class: "perf-runs" },
+    h("h3", {},
+      h("button", {
+        type: "button",
+        class: "perf-toggle",
+        "aria-expanded": String(open),
+        "aria-controls": "perf-runs",
+        "data-key": "btn:perf-runs",
+        onclick: e => togglePerfRuns(e.currentTarget),
+      }, h("span", { text: `Each run (${runs.length})` }), h("span", { class: "pw-chevron", "aria-hidden": "true" }, icon("right")))),
+    h("ul", { class: "perf-list", id: "perf-runs", hidden: !open },
+      runs.map(r => perfItem(r.status, h("strong", { text: r.title }), r.reason ? h("span", { class: "muted", text: ` · ${r.reason}` }) : ""))));
+}
+
+function togglePerfRuns(btn) {
+  state.perfRunsOpen = !state.perfRunsOpen;
+  btn.setAttribute("aria-expanded", String(state.perfRunsOpen));
+  document.getElementById("perf-runs").hidden = !state.perfRunsOpen;
 }
 
 // ---------- plan grid ----------

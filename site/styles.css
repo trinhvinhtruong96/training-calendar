@@ -686,6 +686,48 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
   .card { padding: 16px; }
   .week-row { gap: 10px; padding: 10px 8px; }
 }
+/* ---------- performance ---------- */
+.perf-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.perf-tile { min-width: 0; padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-2); }
+.perf-label { margin: 0; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.perf-value { margin: 4px 0 6px; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.perf-meta { margin: 2px 0 0; font-size: 0.85rem; color: var(--muted); }
+.perf-meta.k-good { color: var(--ok); font-weight: 600; }
+.perf-meta.k-note { color: var(--fg); font-weight: 600; }
+.perf-note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  font-size: 0.9rem;
+}
+.perf-sub { margin: 18px 0 8px; font-size: 1rem; }
+.perf-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.perf-list[hidden] { display: none; }
+.perf-item { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.perf-icon { font-weight: 800; text-align: center; color: var(--muted); }
+.perf-item.s-ok .perf-icon { color: var(--ok); }
+.perf-item.s-check .perf-icon { color: var(--danger); }
+.perf-suggest { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
+.perf-runs h3 { margin: 12px 0 0; font-size: inherit; font-weight: inherit; }
+.perf-toggle {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.perf-toggle[aria-expanded="true"] .pw-chevron .icon { transform: rotate(90deg); }
+
 @media (max-width: 719px) {
   .grid-wrap { display: none; }
 }
@@ -698,13 +740,14 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 @media (min-width: 1024px) {
   .layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "today week" "plan plan";
+    grid-template-areas: "today week" "today perf" "plan plan";
     align-items: start;
     gap: 24px;
     padding: 24px 24px 48px;
   }
   .today { grid-area: today; }
   .week { grid-area: week; }
+  .perf { grid-area: perf; }
   .plan { grid-area: plan; }
   .fab { display: none; }
   .sheet {
