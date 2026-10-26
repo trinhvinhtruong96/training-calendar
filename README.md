@@ -2,15 +2,17 @@
 
 A small web page for the HM sub-2:00 plan (20 Oct 2026 → race on Sun 10 Jan 2027). It shows today's
 workout, this week, all 12 weeks with today highlighted, and your completed runs next to each planned
-workout. Everything is read live from [intervals.icu](https://intervals.icu) in your browser.
+workout, plus a **Performance** card: your threshold pace and heart rate, a review of the last 10 days and
+suggestions. Everything is read live from [intervals.icu](https://intervals.icu) in your browser.
 
 Live site: <https://trinhvinhtruong96.github.io/training-calendar/>
 
 ## Use it
 
 1. Open the live site on your phone or PC.
-2. Press **Log in with intervals.icu** and allow access on intervals.icu (only read access to planned
-   workouts and runs is asked for). Or open **Use an API key instead**, paste your intervals.icu API key
+2. Press **Log in with intervals.icu** and allow access on intervals.icu (only read access is asked for:
+   planned workouts and runs, plus wellness and settings for the Performance card, which you may untick).
+   Or open **Use an API key instead**, paste your intervals.icu API key
    (intervals.icu → Settings → Developer Settings → API Key) and press **Connect**. The login or key is
    saved only in that browser, so do this once per device. The login button shows once `OAUTH.clientId`
    is set (see below); until then the page offers the key only.
@@ -44,8 +46,8 @@ intervals.icu (for example new paces after a test) show up the next time the pag
 - The login (or key) and the last loaded data live in your browser's local storage. Settings → **Log out
   on this device** (or **Forget key on this device**) removes them; logging out also ends the login on
   intervals.icu. You can end a login there too (Settings → Apps), or revoke a key under Developer Settings.
-- The login uses OAuth with PKCE and no client secret, and grants read access to planned workouts and
-  runs only. The page only reads from intervals.icu and only talks to `https://intervals.icu` (enforced by
+- The login uses OAuth with PKCE and no client secret, and grants read access only: planned workouts, runs,
+  wellness (resting HR, fitness) and sport settings. The page only reads from intervals.icu and only talks to `https://intervals.icu` (enforced by
   its Content Security Policy). An API key, though, gives full access to your intervals.icu account.
 - All GitHub Pages sites of one account share the origin `https://trinhvinhtruong96.github.io`, and
   with it the browser's local storage. Any other Pages site you publish under this account (and any
@@ -66,6 +68,7 @@ npm run serve   # http://localhost:8080
 | `site/index.html`, `site/styles.css` | Page shell and styles (light/dark, phone/PC) |
 | `site/src/config.js` | Plan dates, title and phase names |
 | `site/src/dates.js`, `workout.js`, `model.js` | Pure logic: dates, workouts, days/weeks/statuses |
+| `site/src/performance.js` | Pure logic: threshold estimates, 10-day review and suggestions for the Performance card |
 | `site/src/api.js` | Read-only intervals.icu client and browser storage |
 | `site/src/auth.js` | "Log in with intervals.icu" (OAuth with PKCE, no secret) |
 | `site/src/app.js` | Rendering and interaction |

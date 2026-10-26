@@ -45,9 +45,11 @@ Verified on 2026-10-21:
 Static single page. On load it renders the last saved copy from `localStorage` at once, then
 fetches fresh data:
 
-- `GET /api/v1/athlete/0` (only when connecting a key)
+- `GET /api/v1/athlete/0` (when connecting a key, and on every refresh for the Performance card's settings check)
 - `GET /api/v1/athlete/0/events?oldest=2026-10-19&newest=2027-01-10`
 - `GET /api/v1/athlete/0/activities?oldest=2026-10-19&newest=<today>`
+- Performance card: pace and HR curves, wellness, `/athlete/0` and laps per run; see
+  `2026-10-26-performance-card-design.md`. The activities request starts 10 days back when that is earlier.
 
 Auth, one of:
 - **Login** ("Log in with intervals.icu", §3a): `Authorization: Bearer <token>`.
@@ -63,14 +65,14 @@ screen offers the API key only. The app must be marked "public client", with the
 
 1. **Start:** 32 random bytes → base64url `code_verifier`; 16 random bytes → `state`. Both are saved in
    `sessionStorage` (`tc.v1.login`), then the page opens `https://intervals.icu/oauth/authorize` with
-   `client_id`, `redirect_uri` (the page's own address without `index.html`), `scope=CALENDAR:READ,ACTIVITY:READ`,
+   `client_id`, `redirect_uri` (the page's own address without `index.html`), `scope=CALENDAR:READ,ACTIVITY:READ,WELLNESS:READ,SETTINGS:READ`,
    `state`, `code_challenge` (S256) and `code_challenge_method=S256`.
 2. **Return:** intervals.icu opens the page with `?code&state` or `?error`. The page removes the query
    from the address bar at once, takes and deletes the saved values (one use), and refuses a missing or
    different `state`. `error=access_denied` shows "Login cancelled."
 3. **Token:** `POST https://intervals.icu/api/oauth/token`, form-encoded `client_id`, `code`, `code_verifier`.
    The reply carries `access_token`, `scope` and `athlete.name`; the name is used, so no `/athlete/0` call.
-   Both scope areas (calendar, activities) must be granted, as READ or WRITE.
+   Calendar and activities must be granted, as READ or WRITE; wellness and settings are optional (Performance card).
 4. **Saved:** the token in `tc.v1.token` (a saved key is removed, and the other way round).
 5. **Log out:** Settings → Log out clears this device first, then calls `DELETE /api/v1/disconnect-app`
    (best effort).
@@ -188,6 +190,7 @@ the reason (§8). A note says the key is saved only in this browser and the page
    Before 20/10: "Plan starts Tue 20 Oct". After 10/1: "Race done" plus plan totals.
 3. **This week:** 7 days (type colour, name, km, status icon + text); km done / planned; previous and
    next week buttons (and swipe on touch); "This week" button returns.
+3a. **Performance:** threshold pace and HR, last 10 days review, suggestions (spec 2026-10-26).
 4. **Plan:** a table with 12 rows (week label + phase) and Mon–Sun columns; each cell is a button with
    type colour and status icon; test, key and race days are marked; last column km done / planned with
    a bar. Today's cell has a ring.
@@ -200,7 +203,7 @@ the reason (§8). A note says the key is saved only in this browser and the page
    `T` shortcut on/off; Refresh; **Log out on this device** or **Forget key on this device** (removes the
    login or key and cached data from this browser; logging out also ends the login on intervals.icu).
 
-**Layout:** < 720 px one column; ≥ 1024 px two columns (Today + This week left, Plan right);
+**Layout:** < 720 px one column; ≥ 1024 px two columns (Today left; This week and Performance right; Plan below);
 720–1023 px one column with the wide plan table.
 
 **Accessibility:**
