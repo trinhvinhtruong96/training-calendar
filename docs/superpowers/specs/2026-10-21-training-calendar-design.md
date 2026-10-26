@@ -195,7 +195,8 @@ the reason (§8). A note says the key is saved only in this browser and the page
    type colour and status icon; test, key and race days are marked; last column km done / planned with
    a bar. Today's cell has a ring.
 5. **Details** (tap any day): bottom sheet on narrow screens, side panel on wide screens: all events of
-   the day with full steps, notes, actual run(s) and links to intervals.icu. Other activities that day
+   the day with full steps, notes, actual run(s), each run's steps matched to its laps (spec
+   2026-10-26-run-steps-design.md) and links to intervals.icu. Other activities that day
    (e.g. weight training) are listed as "Also".
 6. **Today button** (floating on phone, in header on PC) and key `T` jump to today. The `T` shortcut
    can be switched off in settings (WCAG 2.1.4, single-key shortcuts).

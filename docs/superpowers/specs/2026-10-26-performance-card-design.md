@@ -50,8 +50,7 @@ This week (the Today card spans both rows on the left); below 1024 px it sits be
 2. **Last 10 days · 17–26 Oct**: one line per check (§5.4), each with ✓ or ! **and** words (status is never
    shown by colour alone; the icon has a text label "on target" / "check").
 3. **Suggestions**: up to 3 numbered lines (§5.5).
-4. **Each run (n)**: a button (`aria-expanded`, keyboard operable, same pattern as the phone plan week
-   cards) that opens one line per run in the window: date, workout name, ✓ / ! / – and a short reason.
+4. (Removed 2026-10-26: each run's details now live in the day details, see 2026-10-26-run-steps-design.md.)
 
 Uses the existing colour tokens, light and dark themes, phone (390 px) and PC (1440 px) layouts.
 
@@ -215,5 +214,5 @@ code. Saved data stays in the browser's local storage and is removed by Forget /
 - During the build, a throwaway script (not kept) runs `performance.js` on Truong's real week 1 data and
   the output is compared with §1's expected verdicts.
 - Live check on `http://localhost:8080` with Truong's key and Baobao001's key: values and verdicts as in §1;
-  phone 390 px and PC 1440 px; light and dark; keyboard only (the Each run button, focus order); a declined
+  phone 390 px and PC 1440 px; light and dark; keyboard only (focus order); a declined
   permission simulated by blocking request 3 shows the note and does not log out; offline reload.

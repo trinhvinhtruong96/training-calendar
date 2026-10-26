@@ -23,6 +23,10 @@ Runs appear after your watch syncs them to Garmin Connect and intervals.icu. Cha
 intervals.icu (for example new paces after a test) show up the next time the page refreshes. Press
 **T** to jump to today; you can switch that shortcut off in Settings.
 
+Tap a day to see its details. For a day with a run, **Steps** shows what you ran in each planned step
+(pace, time, HR) against the plan, with ✓ or !. The laps are loaded the first time you open the day and then
+saved in your browser.
+
 ## One-time GitHub setup
 
 1. Make the repository public (Settings → General → Danger Zone → Change visibility). GitHub Pages on
@@ -69,6 +73,7 @@ npm run serve   # http://localhost:8080
 | `site/src/config.js` | Plan dates, title and phase names |
 | `site/src/dates.js`, `workout.js`, `model.js` | Pure logic: dates, workouts, days/weeks/statuses |
 | `site/src/performance.js` | Pure logic: threshold estimates, 10-day review and suggestions for the Performance card |
+| `site/src/steps.js` | Pure logic: matches a run's laps to its planned steps for the day details |
 | `site/src/api.js` | Read-only intervals.icu client and browser storage |
 | `site/src/auth.js` | "Log in with intervals.icu" (OAuth with PKCE, no secret) |
 | `site/src/app.js` | Rendering and interaction |
