@@ -37,8 +37,8 @@ intervals.icu (the card can only point out that its settings differ), Garmin tra
 
 ## 2. Card layout
 
-One card with the heading **Performance** (`h2`). On PC (≥ 1024 px) it sits in the left column under
-This week; below 1024 px it sits between This week and Plan.
+One card with the heading **Performance** (`h2`). On PC (≥ 1024 px) it sits in the right column under
+This week (the Today card spans both rows on the left); below 1024 px it sits between This week and Plan.
 
 1. **Two tiles.**
    - **Threshold pace** `4:23 /km`, a change line, a goal line ("Goal 4:10 for your race pace 4:15 · 13 s to
@@ -67,7 +67,7 @@ existing events and activities requests. `today` is the device's local date; `fi
 | 2 | `/athlete/0/hr-curves?type=Run&curves=` same two windows | per window: best HR held for 3600 s, 1800 s and 60 s (`secs`/`values`), or null where absent |
 | 3 | `/athlete/0/wellness?oldest={today−34}&newest={today}&fields=id,restingHR,ctl,atl` | `[{date, restingHR, ctl, atl}]` |
 | 4 | `/athlete/0` | running sport settings: `lthr`, `max_hr`, `threshold_pace` (m/s) |
-| 5 | `/activity/{id}/intervals` for every run in the window (type Run, VirtualRun or TrailRun, ≥ 2 km) whose laps are not saved yet | `[{distance, movingTime, avgHr, avgSpeed}]` per lap, in order |
+| 5 | `/activity/{id}/intervals` for every run in the window (type Run, VirtualRun or TrailRun, ≥ 2 km) whose laps are not saved yet | `[{distance, movingTime, avgHr}]` per lap, in order; not saved while intervals.icu returns no laps yet |
 
 - The existing activities request starts at `min(PLAN.calendarStart, today−9)` instead of
   `PLAN.calendarStart`, so the 10-day window is complete early in the plan.
@@ -110,7 +110,9 @@ Let `H60`, `H30`, `H1` be the best HR held for 60 min, 30 min and 1 min in a win
 
 Derived per athlete: **easy limit** `E = 0.83 × LT` rounded to the nearest 5 (Truong 150); **hard HR**
 `0.95 × LT` (171). Each run is matched to its planned workout with the existing run matching in
-`model.js`, and typed with `workoutType` (`workout.js`). Unplanned runs are treated as easy. Lap pace =
+`model.js`, and typed with `workoutType` (`workout.js`); a planned workout of type `run` whose name contains
+"Tempo" (Baobao001's Thursday tempo) is typed `tempo` and judged like threshold. Unplanned runs are treated
+as easy. A planned workout for today without a run yet is neither listed nor counted. Lap pace =
 `movingTime / distance`. "Work laps" = laps faster than the middle between the planned easy range's fast
 end and the planned work step's slow end, and ≥ 150 m.
 
@@ -124,7 +126,7 @@ end and the planned work step's slow end, and ≥ 150 m.
 | Intervals and short race-pace sessions (racepace type, not long) | every work lap's pace inside the planned work range, ± 2 s/km | "reps 3:44–3:48, target 3:45–3:51" ✓ / "2 of 5 reps faster than 3:57" ! |
 | Threshold | no work lap with HR > LT + 2 and none more than 5 s/km faster than the fastest planned threshold range | "blocks at HR 182–184, above 180" |
 | Test, race | no verdict (–) | "10 km in 41:48" |
-| Planned workout (date ≤ today) without a run | missed (!) | "missed" |
+| Planned workout (date before today) without a run | missed (!) | "missed" |
 
 Without LT, HR conditions are skipped (pace conditions stay). Without HR on a run: pace only, marked
 "no heart rate". Without laps (one lap): whole-run averages, marked "no laps". Work laps not found where the
@@ -132,9 +134,10 @@ plan has repeats or blocks: "different from the plan" (–). Runs under 2 km: co
 
 ### 5.2 Hard days
 
-A day is **hard** if it has a done planned hard workout (types intervals, threshold, test, racepace, key,
-race) or ≥ 5 min of lap time with HR ≥ 0.95 × LT. Planned hard days = days in the window (≤ today) with a
-planned hard workout. Truong's week 1: Wed, Fri, Sun hard (Sun 19 min ≥ 171) against Wed, Fri planned.
+A day is **hard** if it has a done planned hard workout (types intervals, threshold, tempo, test, racepace,
+key, race) or ≥ 5 min of lap time with HR ≥ 0.95 × LT. Planned hard days = days in the window before today,
+or today when done, with a planned hard workout. Truong's week 1: Wed, Fri, Sun hard (Sun 19 min ≥ 171)
+against Wed, Fri planned.
 
 ### 5.3 Recovery
 
@@ -146,7 +149,7 @@ planned hard workout. Truong's week 1: Wed, Fri, Sun hard (Sun 19 min ≥ 171) a
 
 | Line | Shows | ✓ when |
 |---|---|---|
-| Done | "5 of 5 planned runs · 54.0 of 37.5 km" — planned = workouts in the window up to today; km = all runs, planned or not | no missed workout |
+| Done | "5 of 5 planned runs · 54.0 of 37.5 km" — planned = workouts in the window before today, plus today's when done; km = all runs, planned or not | no missed workout |
 | Easy runs | "2 of 5 easy (HR under 150)" — easy-type runs ≥ 2 km, planned or not | all easy-type runs ✓ |
 | Hard sessions | "0 of 2 on target · 3 hard days, plan had 2" | all hard runs ✓ and hard days ≤ planned |
 | Easy share | "45 % of running time under HR 150 (aim 70–80 %)" — lap time with HR ≤ E / lap time with HR, runs ≥ 2 km | ≥ 70 % |
