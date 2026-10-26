@@ -709,24 +709,14 @@ dialog::backdrop { background: rgb(2 6 23 / 0.55); backdrop-filter: blur(2px); }
 .perf-item.s-ok .perf-icon { color: var(--ok); }
 .perf-item.s-check .perf-icon { color: var(--danger); }
 .perf-suggest { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
-.perf-runs h3 { margin: 12px 0 0; font-size: inherit; font-weight: inherit; }
-.perf-toggle {
-  width: 100%;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 0;
-  border: 0;
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-}
-.perf-toggle[aria-expanded="true"] .pw-chevron .icon { transform: rotate(90deg); }
+
+/* ---------- run steps (day details) ---------- */
+.steps-result { margin-top: 14px; }
+.steps-title { margin: 0 0 8px; font-size: 0.95rem; }
+.step-done { display: block; font-size: 0.9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.steps-reps { padding-left: 28px; }
+.steps-reps[hidden] { display: none; }
+.steps-result .btn.small { margin-top: 6px; }
 
 @media (max-width: 719px) {
   .grid-wrap { display: none; }

@@ -1,6 +1,6 @@
 // The page: rendering and interaction. All data logic lives in the pure modules.
 import { OAUTH, PLAN } from "./config.js";
-import { KeyError, NetworkError, connect, createStore, refresh, saveLogin } from "./api.js";
+import { KeyError, NetworkError, connect, createStore, loadDayLaps, refresh, saveLogin } from "./api.js";
 import { finishLogin, readCallback, redirectUri, revoke, startLogin } from "./auth.js";
 import {
   WEEKDAYS, addDays, clampWeek, formatDate, formatDuration, formatKm, formatShortRange, localToday, timeAgo, weekNumber,
@@ -8,6 +8,7 @@ import {
 import { GROUP, TYPE_LABEL, formatStepAmount, noteText, paceRange, shortName, stepLevel, stepName, workoutBar } from "./workout.js";
 import { buildModel, dayLabel, dayUrl, headerInfo, primaryWorkout, resultText, runSummary, statusInfo } from "./model.js";
 import { buildPerformance } from "./performance.js";
+import { lapLines, matchSteps } from "./steps.js";
 
 let storage = null;
 try {
@@ -36,7 +37,8 @@ const state = {
   session: 0, // bumped on Forget / new key so late refresh results are dropped
   openWeeks: null, // week numbers expanded in the phone plan list
   performance: null, // Performance card data (buildPerformance)
-  perfRunsOpen: false, // "Each run" list expanded
+  openReps: new Set(), // "Show reps" lists open in the day details; cleared when the details close
+  detailsFocus: null, // data-key of the focused steps control while the day details are rebuilt
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -234,7 +236,7 @@ function previewButton(day, label) {
     h("span", { class: "preview-meta", text: w.distance ? `${formatKm(w.distance)} km` : "" }));
 }
 
-function workoutBlock(w, { titleId = null, headingTag = "h3" } = {}) {
+function workoutBlock(w, { titleId = null, headingTag = "h3", steps = false } = {}) {
   const note = noteText(w.description);
   const meta = [
     TYPE_LABEL[w.type],
@@ -247,7 +249,7 @@ function workoutBlock(w, { titleId = null, headingTag = "h3" } = {}) {
     note ? h("p", { class: "workout-note", text: note }) : "",
     renderBar(w.steps),
     renderSteps(w.steps),
-    w.run ? renderRun(w.run, "Your run") : renderPending(w));
+    w.run ? [renderRun(w.run, "Your run"), steps ? stepsSection(w.run, w) : ""] : renderPending(w));
 }
 
 function renderPending(w) {
@@ -306,6 +308,91 @@ function renderRun(a, label) {
       ? h("dl", { class: "run-stats" }, stats.map(([k, v]) => h("div", { class: "stat" }, h("dt", { text: k }), h("dd", { text: v }))))
       : "",
     externalLink(s.url, "Open in intervals.icu"));
+}
+
+// ---------- run steps (day details) ----------
+// Filled after the laps load; a late result is dropped if another day is open by then. The details are rebuilt
+// on every render, so open "Show reps" lists (state.openReps) and the focused control (state.detailsFocus) are
+// kept in state. Control keys: steps:<runId>:title | :retry | :reps:<i>.
+const byKeyIn = (root, key) => root.querySelector(`[data-key="${CSS.escape(key)}"]`);
+const stepsNote = text => h("p", { class: "muted small", text });
+
+function stepsSection(run, workout) {
+  const title = h("h4", { class: "steps-title", tabindex: "-1", "data-key": `steps:${run.id}:title`, text: workout ? "Steps" : "Laps" });
+  const body = h("div", {});
+  fillSteps(body, title, run, workout);
+  return h("div", { class: "steps-result" }, title, body);
+}
+
+function fillSteps(body, title, run, workout) {
+  const date = state.detailsDate;
+  if (body.contains(document.activeElement)) title.focus(); // Try again: keep focus in this section while loading
+  body.replaceChildren(stepsNote("Loading laps…"));
+  loadDayLaps(run.id, {
+    store,
+    knownIds: (state.data?.activities ?? []).map(a => a.id),
+    extra: state.data?.performance?.laps ?? {},
+  }).then(res => {
+    if (!body.isConnected || state.detailsDate !== date) return;
+    body.replaceChildren(...stepsContent(res, run, workout, body, title));
+    const key = state.detailsFocus;
+    if (key?.startsWith(`steps:${run.id}:`)) {
+      state.detailsFocus = null;
+      (byKeyIn(body, key) ?? title).focus({ preventScroll: true });
+    }
+  });
+}
+
+function stepsContent(res, run, workout, body, title) {
+  if (res.error) {
+    return [stepsNote("Couldn't load the laps."),
+      h("button", {
+        type: "button", class: "btn ghost small", "data-key": `steps:${run.id}:retry`,
+        onclick: () => fillSteps(body, title, run, workout),
+      }, "Try again")];
+  }
+  if (res.notReady) return [stepsNote("Laps aren't ready yet in intervals.icu.")];
+  const m = workout ? matchSteps(workout, res.laps, state.performance?.limits ?? {}) : { kind: "laps", lines: lapLines(res.laps) };
+  if (m.kind === "single" || (m.kind === "laps" && !m.lines.length)) return [stepsNote("No laps from your watch.")];
+  const lines = items => h("ul", { class: "perf-list steps-list" }, items.map(t => perfItem("none", h("span", { text: t }))));
+  if (m.kind === "laps") return [lines(m.lines)];
+  const list = h("ul", { class: "perf-list steps-list" });
+  m.items.forEach((it, i) => {
+    if (it.kind === "step") {
+      list.append(stepRow(it));
+      return;
+    }
+    const id = `reps-${run.id}-${i}`;
+    const open = state.openReps.has(id);
+    list.append(
+      stepRow(it, h("button", {
+        type: "button", class: "btn ghost small", "aria-expanded": String(open), "aria-controls": id,
+        "data-key": `steps:${run.id}:reps:${i}`, onclick: e => toggleReps(e.currentTarget, id),
+      }, open ? "Hide reps" : "Show reps")),
+      h("li", { class: "steps-reps", id, hidden: !open }, h("ul", { class: "perf-list" }, it.rows.map(r => stepRow(r)))));
+  });
+  if (m.after) list.append(perfItem("none", h("strong", { text: "After the workout" }), h("span", { class: "step-done", text: m.after })));
+  const out = [list];
+  if (m.notDone.length) out.push(stepsNote(`Not done: ${m.notDone.join(", ")}`));
+  if (m.unmatched.length) out.push(stepsNote("Steps after this didn't match your laps:"), lines(m.unmatched));
+  return out;
+}
+
+function stepRow(r, extra = "") {
+  return perfItem(r.status ?? "none",
+    h("strong", { text: r.name }),
+    r.planned ? h("span", { class: "muted", text: ` · ${r.planned}` }) : "",
+    h("span", { class: "step-done", text: [r.done, r.reason].filter(Boolean).join(" · ") }),
+    extra);
+}
+
+function toggleReps(btn, id) {
+  const open = !state.openReps.has(id);
+  if (open) state.openReps.add(id);
+  else state.openReps.delete(id);
+  btn.setAttribute("aria-expanded", String(open));
+  btn.textContent = open ? "Hide reps" : "Show reps";
+  document.getElementById(id).hidden = !open;
 }
 
 // ---------- week ----------
@@ -415,6 +502,7 @@ const PERF_STATUS = {
   check: { icon: "!", label: "Check" },
   neutral: { icon: "–", label: "No verdict" },
   skip: { icon: "·", label: "Not judged" },
+  none: { icon: "", label: "" },
 };
 
 function renderPerformance() {
@@ -431,8 +519,7 @@ function renderPerformance() {
     h("h3", { class: "perf-sub", text: `Last 10 days · ${formatShortRange(p.from, p.to)}` }),
     h("ul", { class: "perf-list" }, p.lines.map(l => perfItem(l.status, h("span", { text: l.text })))),
     h("h3", { class: "perf-sub", text: "Suggestions" }),
-    h("ol", { class: "perf-suggest" }, p.suggestions.map(s => h("li", { text: s }))),
-    perfRuns(p.runs));
+    h("ol", { class: "perf-suggest" }, p.suggestions.map(s => h("li", { text: s }))));
   return section;
 }
 
@@ -448,30 +535,7 @@ function perfItem(status, ...content) {
   const s = PERF_STATUS[status] ?? PERF_STATUS.neutral;
   return h("li", { class: `perf-item s-${status}` },
     h("span", { class: "perf-icon", "aria-hidden": "true", text: s.icon }),
-    h("span", {}, h("span", { class: "sr-only", text: `${s.label}: ` }), ...content));
-}
-
-function perfRuns(runs) {
-  if (!runs.length) return "";
-  const open = state.perfRunsOpen;
-  return h("div", { class: "perf-runs" },
-    h("h3", {},
-      h("button", {
-        type: "button",
-        class: "perf-toggle",
-        "aria-expanded": String(open),
-        "aria-controls": "perf-runs",
-        "data-key": "btn:perf-runs",
-        onclick: e => togglePerfRuns(e.currentTarget),
-      }, h("span", { text: `Each run (${runs.length})` }), h("span", { class: "pw-chevron", "aria-hidden": "true" }, icon("right")))),
-    h("ul", { class: "perf-list", id: "perf-runs", hidden: !open },
-      runs.map(r => perfItem(r.status, h("strong", { text: r.title }), r.reason ? h("span", { class: "muted", text: ` · ${r.reason}` }) : ""))));
-}
-
-function togglePerfRuns(btn) {
-  state.perfRunsOpen = !state.perfRunsOpen;
-  btn.setAttribute("aria-expanded", String(state.perfRunsOpen));
-  document.getElementById("perf-runs").hidden = !state.perfRunsOpen;
+    h("span", {}, s.label ? h("span", { class: "sr-only", text: `${s.label}: ` }) : "", ...content));
 }
 
 // ---------- plan grid ----------
@@ -640,19 +704,22 @@ function openDetails(date, opener) {
 function fillDetails(date) {
   const d = state.model.byDate.get(date);
   if (!d) return;
+  const body = details.querySelector("#details-body");
+  const focused = body.contains(document.activeElement) ? document.activeElement : null;
+  state.detailsFocus = focused?.dataset.key ?? null;
   const st = statusInfo(d, state.today);
   details.querySelector("#details-eyebrow").textContent = `Week ${d.week} · ${PLAN.phases[d.week - 1]}${d.isToday ? " · Today" : ""}`;
   details.querySelector("#details-title").textContent = formatDate(date);
   const parts = [];
   if (st.short) parts.push(h("p", { class: `chip s-${st.key}` }, st.icon ? h("span", { "aria-hidden": "true", text: st.icon }) : "", st.short));
-  for (const w of d.workouts) parts.push(workoutBlock(w, { headingTag: "h3" }));
+  for (const w of d.workouts) parts.push(workoutBlock(w, { headingTag: "h3", steps: true }));
   for (const n of d.notes) {
     const text = noteText(n.description);
     parts.push(h("article", { class: "workout g-rest" },
       h("h3", { class: "workout-title", text: n.name === "Rest" ? "Rest day" : n.name || "Note" }),
       text ? h("p", { class: "workout-note", text }) : ""));
   }
-  for (const a of d.extraRuns) parts.push(renderRun(a, "Extra run"));
+  for (const a of d.extraRuns) parts.push(renderRun(a, "Extra run"), stepsSection(a, null));
   if (d.others.length) {
     parts.push(h("div", { class: "also", role: "group", "aria-labelledby": "also-title" },
       h("h3", { id: "also-title", text: "Also on this day" }),
@@ -661,12 +728,19 @@ function fillDetails(date) {
   }
   if (!d.workouts.length && !d.notes.length && !d.activities.length) parts.push(h("p", { class: "muted", text: "Nothing planned for this day." }));
   parts.push(h("p", { class: "details-link" }, externalLink(dayUrl(date), "Open this week in intervals.icu")));
-  details.querySelector("#details-body").replaceChildren(...parts);
+  body.replaceChildren(...parts);
   const first = state.model.days[0].date;
   const last = state.model.days.at(-1).date;
   details.querySelector('[data-action="prev"]').disabled = date <= first;
   details.querySelector('[data-action="next"]').disabled = date >= last;
   if (document.activeElement?.disabled) details.querySelector('[data-action="close"]').focus();
+  // Focus was in the rebuilt body: a steps control gets it back once its laps are in (fillSteps); until then
+  // its section title holds it. Anything else (a link) falls back to Close.
+  if (focused) {
+    const key = state.detailsFocus ?? "";
+    const title = key.startsWith("steps:") ? byKeyIn(body, `steps:${key.split(":")[1]}:title`) : null;
+    (title ?? details.querySelector('[data-action="close"]')).focus({ preventScroll: true });
+  }
 }
 
 function stepDetails(dir) {
@@ -728,6 +802,8 @@ function wireDialogs() {
   });
   details.addEventListener("close", () => {
     state.detailsDate = null;
+    state.openReps.clear();
+    state.detailsFocus = null;
     const opener = state.opener;
     state.opener = null;
     const key = opener?.dataset?.key;

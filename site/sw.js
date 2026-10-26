@@ -13,6 +13,7 @@ const FILES = [
   "src/dates.js",
   "src/model.js",
   "src/performance.js",
+  "src/steps.js",
   "src/workout.js",
   "icons/icon.svg",
   "icons/icon-192.png",
