@@ -45,8 +45,11 @@ This week (the Today card spans both rows on the left); below 1024 px it sits be
      go"), and a source line ("from your best efforts, last 90 days").
    - **Threshold heart rate** `180 bpm`, a change line, and a source line ("highest HR held for 60 min, last
      90 days" or "… for 30 min, minus 2").
-   - Under the tiles, only when intervals.icu's settings differ (§5.6): "intervals.icu has threshold HR 168
-     set: its zones and load for you use 168."
+   - Without a hard effort in the last 90 days (§4), each tile shows intervals.icu's own setting instead,
+     with the source line "From your intervals.icu settings" (HR adds "· a test or race of 30+ min updates
+     it"); the pace tile keeps its goal line, neither tile has a change line.
+   - Under the tiles, only when intervals.icu's settings differ from an estimate (§5.6): "intervals.icu has
+     threshold HR 168 set: its zones and load for you use 168."
 2. **Last 10 days · 17–26 Oct**: one line per check (§5.4), each with ✓ or ! **and** words (status is never
    shown by colour alone; the icon has a text label "on target" / "check").
 3. **Suggestions**: up to 3 numbered lines (§5.5).
@@ -92,6 +95,9 @@ Let `H60`, `H30`, `H1` be the best HR held for 60 min, 30 min and 1 min in a win
   else none ("Not enough hard running yet: a test or race of 30+ min sets it"). The 88 % check stops an
   athlete with only easy runs from getting an easy-run HR as threshold. Truong: H60 180 ≥ 163 → 180.
 - **Threshold pace (T):** `1000 / criticalSpeed` s/km from the window's CS model; none if there is no model.
+- **No estimate, settings readable:** LT = `settings.lthr`, T = `1000 / settings.threshold_pace`. LT from the
+  settings also sets the easy limit and the threshold-block HR checks (§5). It does not count as a hard effort,
+  so T still never comes from a CS model of easy runs.
 - **Change since plan start** (same rules on the window ending on `firstDay`):
   - pace faster by ≥ 2 s/km: "8 s faster since 20 Oct"; within 2 s: "same as 20 Oct"; slower: "best
     efforts from before {today−89} no longer count" (within a window a best can only improve, so a slower
@@ -173,7 +179,8 @@ The first 3 that apply, in this order:
 
 ### 5.6 Settings differ
 
-When settings are readable and `|lthr − LT| ≥ 3`, or `threshold_pace` is missing or ≥ 5 s/km from T.
+When settings are readable and `|lthr − LT| ≥ 3`, or `threshold_pace` is missing or ≥ 5 s/km from T. Only
+estimates from runs are compared: a tile that shows the setting (§4) adds no note and no tip.
 
 ## 6. Missing data
 

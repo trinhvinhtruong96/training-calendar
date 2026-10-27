@@ -75,14 +75,37 @@ function racePaceOf(events, today) {
   return step ? (step.pace.start + step.pace.end) / 2 : null;
 }
 
+// Goal line: the threshold pace that goes with the race pace in the athlete's calendar, against the current one.
+function goalLine(now, events, today) {
+  const racePace = racePaceOf(events, today);
+  if (!racePace) return null;
+  const goal = goalThreshold(racePace);
+  const gap = Math.round(now - goal);
+  return {
+    kind: gap <= 0 ? "good" : "note",
+    text: `Goal ${formatPace(goal)} for your race pace ${formatPace(racePace)} · ${gap <= 0 ? "reached" : `${gap} s to go`}`,
+  };
+}
+
+const FROM_SETTINGS = "From your intervals.icu settings";
+
 // hardEffort: the HR curve shows a hard effort (or the athlete records no HR, so it can't tell). Without one, a
-// critical-speed model fitted to easy runs only would give a meaningless "threshold" (spec §1: Baobao001).
+// critical-speed model fitted to easy runs only would give a meaningless "threshold" (spec §1: Baobao001), so the
+// tile falls back to the threshold pace set in intervals.icu. fromRuns: the pace is the estimate, not the setting.
 function paceTile(perf, events, today, plan, hardEffort, hrMissing) {
   const now = hardEffort ? thresholdPace(perf.paceNow) : null;
   const tile = { label: "Threshold pace", value: now ? `${formatPace(now)} /km` : null, lines: [] };
   if (!now) {
-    tile.lines.push({ kind: "muted", text: hrMissing ? COULD_NOT_LOAD : "Not enough hard running yet: a test or race sets it." });
-    return { tile, pace: null };
+    const set = perf.settings?.thresholdPace > 0 ? 1000 / perf.settings.thresholdPace : null;
+    if (!set) {
+      tile.lines.push({ kind: "muted", text: hrMissing ? COULD_NOT_LOAD : "Not enough hard running yet: a test or race sets it." });
+      return { tile, pace: null, fromRuns: false };
+    }
+    tile.value = `${formatPace(set)} /km`;
+    const goal = goalLine(set, events, today);
+    if (goal) tile.lines.push(goal);
+    tile.lines.push({ kind: "muted", text: FROM_SETTINGS });
+    return { tile, pace: set, fromRuns: false };
   }
   const start = thresholdPace(perf.pacePlanStart);
   if (start && today > plan.firstDay) {
@@ -91,25 +114,25 @@ function paceTile(perf, events, today, plan, hardEffort, hrMissing) {
     else if (faster > -2) tile.lines.push({ kind: "muted", text: `Same as ${dayMonth(plan.firstDay)}` });
     else tile.lines.push({ kind: "muted", text: `Best efforts from before ${dayMonth(addDays(today, -(CURVE_DAYS - 1)))} no longer count` });
   }
-  const racePace = racePaceOf(events, today);
-  if (racePace) {
-    const goal = goalThreshold(racePace);
-    const gap = Math.round(now - goal);
-    tile.lines.push({
-      kind: gap <= 0 ? "good" : "note",
-      text: `Goal ${formatPace(goal)} for your race pace ${formatPace(racePace)} · ${gap <= 0 ? "reached" : `${gap} s to go`}`,
-    });
-  }
+  const goal = goalLine(now, events, today);
+  if (goal) tile.lines.push(goal);
   tile.lines.push({ kind: "muted", text: "From your best efforts, last 90 days" });
-  return { tile, pace: now };
+  return { tile, pace: now, fromRuns: true };
 }
 
+// No hard effort in the last 90 days: the threshold HR set in intervals.icu. fromRuns: the HR is the estimate.
 function hrTile(perf, today, plan) {
   const lt = thresholdHr(perf.hrNow, perf.settings);
   const tile = { label: "Threshold heart rate", value: lt ? `${lt.bpm} bpm` : null, lines: [] };
   if (!lt) {
-    tile.lines.push({ kind: "muted", text: perf.hrNow == null ? COULD_NOT_LOAD : "Not enough hard running yet: a test or race of 30+ min sets it." });
-    return { tile, lt: null };
+    const set = perf.settings?.lthr > 0 ? perf.settings.lthr : null;
+    if (!set) {
+      tile.lines.push({ kind: "muted", text: perf.hrNow == null ? COULD_NOT_LOAD : "Not enough hard running yet: a test or race of 30+ min sets it." });
+      return { tile, lt: null, fromRuns: false };
+    }
+    tile.value = `${set} bpm`;
+    tile.lines.push({ kind: "muted", text: `${FROM_SETTINGS} · a test or race of 30+ min updates it` });
+    return { tile, lt: set, fromRuns: false };
   }
   const start = thresholdHr(perf.hrPlanStart, perf.settings);
   if (start && today > plan.firstDay) {
@@ -119,7 +142,7 @@ function hrTile(perf, today, plan) {
     });
   }
   tile.lines.push({ kind: "muted", text: `Highest HR held for ${lt.minutes} min${lt.minutes === 30 ? ", minus 2" : ""}, last 90 days` });
-  return { tile, lt: lt.bpm };
+  return { tile, lt: lt.bpm, fromRuns: true };
 }
 
 // Spec §5.6: intervals.icu's own settings differ from the estimates.
@@ -378,11 +401,12 @@ export function buildPerformance(data, today, plan = PLAN) {
   const hrInfo = hrTile(perf, today, plan);
   // HR curve missing (request failed, nothing saved): we can't tell whether the pace model came from hard efforts.
   const hrMissing = perf.hrNow == null;
-  const hardEffort = !hrMissing && (Boolean(hrInfo.lt) || !(perf.hrNow.h1 > 0));
+  const hardEffort = !hrMissing && (hrInfo.fromRuns || !(perf.hrNow.h1 > 0));
   const paceInfo = paceTile(perf, data.events ?? [], today, plan, hardEffort, hrMissing);
   out.pace = paceInfo.tile;
   out.hr = hrInfo.tile;
-  out.settingsNote = settingsNote(perf.settings, hrInfo.lt, paceInfo.pace);
+  // Only estimates from runs are compared with the settings; a value taken from the settings matches itself.
+  out.settingsNote = settingsNote(perf.settings, hrInfo.fromRuns ? hrInfo.lt : null, paceInfo.fromRuns ? paceInfo.pace : null);
   const lt = hrInfo.lt;
   const ctx = { lt, easyLimit: lt ? round5(0.83 * lt) : null };
   out.limits = ctx;

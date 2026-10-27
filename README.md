@@ -2,8 +2,9 @@
 
 A small web page for the HM sub-2:00 plan (20 Oct 2026 → race on Sun 10 Jan 2027). It shows today's
 workout, this week, all 12 weeks with today highlighted, and your completed runs next to each planned
-workout, plus a **Performance** card: your threshold pace and heart rate, a review of the last 10 days and
-suggestions. Everything is read live from [intervals.icu](https://intervals.icu) in your browser.
+workout, plus a **Performance** card: your threshold pace and heart rate (from your hard runs of the last 90
+days, or your intervals.icu settings until there is one), a review of the last 10 days and suggestions.
+Everything is read live from [intervals.icu](https://intervals.icu) in your browser.
 
 Live site: <https://trinhvinhtruong96.github.io/training-calendar/>
 
